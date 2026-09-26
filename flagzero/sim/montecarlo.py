@@ -14,6 +14,8 @@ CLI:  python3 -m flagzero.sim.montecarlo --n 10000 --seed 42
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import argparse
 import json
 import time
@@ -52,7 +54,7 @@ def _summary(t_warn, t_eff, t_arrive, dist0, v, react, a, d_need):
     }
 
 
-def run(n: int = config.MC_N, seed: int | None = None, **overrides) -> dict:
+def run(n: int = config.MC_N, seed: Optional[int] = None, **overrides) -> dict:
     p = {**DEFAULTS, **{k: float(v) for k, v in overrides.items() if k in DEFAULTS and v is not None}}
     n = int(max(100, min(n, 500_000)))
     t0 = time.perf_counter()

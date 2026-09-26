@@ -8,6 +8,8 @@ Headless demo:  python3 -m flagzero.sim.sim --seconds 20
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import argparse
 import math
 import random
@@ -23,8 +25,8 @@ def kmh(v: float) -> float:
 
 
 class Simulation:
-    def __init__(self, world: WorldState | None = None, track: Track | None = None,
-                 seed: int | None = config.SIM_SEED):
+    def __init__(self, world: Optional[WorldState] = None, track: Optional[Track] = None,
+                 seed: Optional[int] = config.SIM_SEED):
         self.world = world or WorldState()
         self.track = track or default_track()
         self.lap = self.track.lap_length_m
@@ -92,7 +94,7 @@ class Simulation:
             if c.state == STOPPED:
                 c.state = RUNNING
 
-    def apply_camera(self, car: int, track_m: float, now_s: float | None = None) -> None:
+    def apply_camera(self, car: int, track_m: float, now_s: Optional[float] = None) -> None:
         """Vision sees this car: its camera position replaces the sim position."""
         c = self.world.cars.get(car)
         if not c:
@@ -113,7 +115,7 @@ class Simulation:
             c.state = CAMERA
 
     # ------------------------------------------------------------ main update
-    def tick(self, dt: float, now_s: float | None = None) -> None:
+    def tick(self, dt: float, now_s: Optional[float] = None) -> None:
         """Advance every car by dt seconds. Same code live and headless."""
         now_s = time.monotonic() if now_s is None else now_s
         self.t += dt
@@ -138,7 +140,7 @@ class Simulation:
                 c.speed_mps = min(target, c.speed_mps + self.a_acc * dt)
             c.track_m = wrap(c.track_m + c.speed_mps * dt, self.lap)
 
-    def run_headless(self, seconds: float, dt: float | None = None) -> None:
+    def run_headless(self, seconds: float, dt: Optional[float] = None) -> None:
         """Run as fast as possible with no server and no sleeping."""
         dt = dt or 1.0 / config.SERVER_TICK_HZ
         steps = int(seconds / dt)

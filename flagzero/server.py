@@ -10,6 +10,8 @@ All the logic lives in core/engine.py; this file only moves messages.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import asyncio
 import contextlib
 import json
@@ -144,12 +146,12 @@ def api_state() -> JSONResponse:
 
 
 @app.get("/api/montecarlo")
-def api_montecarlo(n: int = config.MC_N, seed: int | None = None,
-                   visibility: float | None = None,
-                   marshal_react_min: float | None = None, marshal_react_max: float | None = None,
-                   speed_min: float | None = None, speed_max: float | None = None,
-                   sightline_min: float | None = None, sightline_max: float | None = None,
-                   gap_min: float | None = None, gap_max: float | None = None) -> JSONResponse:
+def api_montecarlo(n: int = config.MC_N, seed: Optional[int] = None,
+                   visibility: Optional[float] = None,
+                   marshal_react_min: Optional[float] = None, marshal_react_max: Optional[float] = None,
+                   speed_min: Optional[float] = None, speed_max: Optional[float] = None,
+                   sightline_min: Optional[float] = None, sightline_max: Optional[float] = None,
+                   gap_min: Optional[float] = None, gap_max: Optional[float] = None) -> JSONResponse:
     """Re-run the Monte Carlo with the dashboard's slider values."""
     res = montecarlo.run(n, seed, visibility=visibility,
                          marshal_react_min=marshal_react_min, marshal_react_max=marshal_react_max,
@@ -187,7 +189,7 @@ def web_asset(name: str, ext: str) -> Response:
 
 
 # ---------------------------------------------------------------- websockets
-async def _read_json(ws: WebSocket) -> tuple[dict | None, int]:
+async def _read_json(ws: WebSocket) -> tuple[Optional[dict], int]:
     raw = await ws.receive_text()
     t = now_ms()                      # stamp receive time before parsing
     try:

@@ -6,6 +6,8 @@ server turns it all into the "state" message for dashboards.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -30,7 +32,7 @@ class CarState:
     state: str = RUNNING
     has_phone: bool = False
     warning: int = 0                 # 0 NORMAL ... 5 RED (set by the router, A2)
-    camera_seen_s: float | None = None   # monotonic time of last camera fix
+    camera_seen_s: Optional[float] = None   # monotonic time of last camera fix
     pace: float = 1.0                # per-car speed multiplier
 
     @property
@@ -61,21 +63,21 @@ class Incident:
     kind: str                        # headline kind: IMPACT, SPIN, DEBRIS, STOPPED_VEHICLE, ...
     track_m: float
     corner: str
-    car: int | None = None
+    car: Optional[int] = None
     sources: list[dict] = field(default_factory=list)
     severity: int = 0
     fused_conf: float = 0.0
     still: bool = False              # phone reported still:true after the event
-    countdown: str | None = None     # None, PENDING, OK, TIMEOUT
-    countdown_started_ms: int | None = None
-    impact_ms: int | None = None
-    medical: str | None = None       # None, MONITOR, URGENT
-    detect_ms: int | None = None     # first server receive time (latency, A6)
+    countdown: Optional[str] = None     # None, PENDING, OK, TIMEOUT
+    countdown_started_ms: Optional[int] = None
+    impact_ms: Optional[int] = None
+    medical: Optional[str] = None       # None, MONITOR, URGENT
+    detect_ms: Optional[int] = None     # first server receive time (latency, A6)
     approaching: list[dict] = field(default_factory=list)
     created_ms: int = field(default_factory=now_ms)
     updated_ms: int = field(default_factory=now_ms)
 
-    def source(self, src: str, kind: str | None = None) -> dict | None:
+    def source(self, src: str, kind: Optional[str] = None) -> Optional[dict]:
         for s in self.sources:
             if s["src"] == src and (kind is None or s["kind"] == kind):
                 return s
@@ -95,7 +97,7 @@ class Incident:
             "created_ms": self.created_ms, "updated_ms": self.updated_ms,
         }
 
-    def countdown_left_s(self) -> int | None:
+    def countdown_left_s(self) -> Optional[int]:
         from flagzero import config
         if self.countdown != "PENDING" or self.countdown_started_ms is None:
             return None
@@ -109,9 +111,10 @@ class WorldState:
     incidents: list[Incident] = field(default_factory=list)
     red_pending: bool = False
     red_confirmed: bool = False
+    red_auto: bool = False           # RED came from a countdown timeout, not a click
     latency: dict[str, Any] = field(default_factory=dict)
     vitals: dict[int, dict] = field(default_factory=dict)   # phone car -> SIM vitals
-    last_vision: dict[str, Any] | None = None
+    last_vision: Optional[dict[str, Any]] = None
     # connections (WebSocket objects); left empty in headless mode
     car_sockets: dict[int, Any] = field(default_factory=dict)
     dash_sockets: set = field(default_factory=set)
@@ -132,6 +135,7 @@ class WorldState:
             "latency": self.latency,
             "red_pending": self.red_pending,
             "red_confirmed": self.red_confirmed,
+            "red_auto": self.red_auto,
             "vitals": {str(k): v for k, v in self.vitals.items()},
             "phones_connected": sorted(self.car_sockets.keys()),
         }

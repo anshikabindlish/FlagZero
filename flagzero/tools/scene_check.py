@@ -3,7 +3,7 @@ phones and the camera. Proves the whole core works with no hardware.
 
 Server must be running. Then:
     python3 -m flagzero.tools.scene_check 1     (debris -> car 21 goes YELLOW)
-    python3 -m flagzero.tools.scene_check 2     (crash -> fusion -> RED)
+    python3 -m flagzero.tools.scene_check 2     (crash -> no OK in 15 s -> automatic RED)
 Use --url wss://<tunnel>.trycloudflare.com to test through the tunnel.
 """
 from __future__ import annotations
@@ -68,9 +68,9 @@ async def run(scene: int, base: str) -> None:
             for _ in range(10):
                 await cam([{"kind": "STOPPED_VEHICLE", "car": 17, "track_m": 1423, "conf": 0.93}], car17)
                 await asyncio.sleep(0.1)
-            print("nobody presses OK ...")
+            print("nobody presses OK within 15 s (phone reports TIMEOUT) ...")
             await p17.send(json.dumps({"type": "countdown_result", "car": 17, "result": "TIMEOUT"}))
-            st = await wait_state(d, lambda s: s["red_pending"])
+            st = await wait_state(d, lambda s: s["red_confirmed"])
 
         inc = st["incidents"][0]
         print(f"\nDASHBOARD  {inc['kind']} at {inc['corner']} {inc['track_m']} m | severity {inc['severity']} "
@@ -81,8 +81,7 @@ async def run(scene: int, base: str) -> None:
                   f"ETA {a['eta_s']} s  level {a['warning']}")
         if scene == 2:
             print(f"  vitals car 17: {st['vitals'].get('17')}")
-            print("race control clicks Confirm red ...")
-            await d.send(json.dumps({"type": "confirm_red"}))
+            print(f"  RED raised automatically: {st['red_auto']} (no Confirm red click needed)")
         await asyncio.sleep(2.0)
         for t in tasks:
             t.cancel()

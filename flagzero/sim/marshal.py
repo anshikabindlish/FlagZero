@@ -8,12 +8,14 @@ Used by the dashboard timeline and by the Monte Carlo, so it lives in one place.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import numpy as np
 
 from flagzero import config
 
 
-def sample(n: int | None = None, rng: np.random.Generator | None = None,
+def sample(n: Optional[int] = None, rng: Optional[np.random.Generator] = None,
            visibility: float = config.MARSHAL_VISIBILITY,
            react_s: tuple[float, float] = config.MARSHAL_REACT_S,
            flag_s: tuple[float, float] = config.MARSHAL_FLAG_S) -> dict:

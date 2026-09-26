@@ -1,6 +1,8 @@
 """Track loading and lap-distance helpers."""
 from __future__ import annotations
 
+from typing import Optional
+
 import json
 from dataclasses import dataclass
 from functools import lru_cache
@@ -51,7 +53,7 @@ class Track:
         return min(self.corners, key=d)
 
 
-def load_track(path: Path | None = None) -> Track:
+def load_track(path: Optional[Path] = None) -> Track:
     data = json.loads((path or config.TRACK_FILE).read_text())
     corners = tuple(
         Corner(c["name"], float(c["s"]), float(c["target_kmh"]), float(c["sightline_m"]))

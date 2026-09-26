@@ -6,6 +6,11 @@
 3  strong IMPACT or ROLLOVER; IMPACT followed by still:true; MULTI_STOP
 4  level 3 AND countdown TIMEOUT AND camera confirms a stationary vehicle
    (at least 3 corroborating signals)  -> RED FLAG RECOMMENDED
+
+Team change: with AUTO_RED_ON_TIMEOUT, a driver who does not press I'm OK
+within COUNTDOWN_S (15 s) makes the incident severity 4 on its own, and RED
+goes out automatically. Race control can still Confirm red by hand for any
+other severity-4 incident.
 """
 from __future__ import annotations
 
@@ -50,6 +55,8 @@ def severity(inc: Incident) -> int:
         + int(inc.countdown == "TIMEOUT")
     if lvl >= 3 and inc.countdown == "TIMEOUT" and corroborating >= 3:
         lvl = 4
+    if config.AUTO_RED_ON_TIMEOUT and inc.countdown == "TIMEOUT":
+        lvl = 4
     return lvl
 
 
@@ -58,4 +65,8 @@ def update(world: WorldState) -> None:
     for inc in world.incidents:
         inc.fused_conf = fused_confidence(inc)
         inc.severity = severity(inc)
+    if config.AUTO_RED_ON_TIMEOUT and any(i.countdown == "TIMEOUT" for i in world.incidents) \
+            and not world.red_confirmed:
+        world.red_confirmed = True
+        world.red_auto = True
     world.red_pending = any(i.severity >= 4 for i in world.incidents) and not world.red_confirmed

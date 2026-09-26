@@ -5,6 +5,8 @@ the same car, or are < 50 m and < 5 s apart. Otherwise a new incident starts.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 from flagzero import config
 from flagzero.core.state import Incident, WorldState
 from flagzero.core.track import Track, upstream_distance
@@ -20,8 +22,8 @@ def _dist(a: float, b: float, lap: float) -> float:
     return min(d, lap - d)
 
 
-def find_incident(world: WorldState, track: Track, car: int | None,
-                  track_m: float, t_ms: int) -> Incident | None:
+def find_incident(world: WorldState, track: Track, car: Optional[int],
+                  track_m: float, t_ms: int) -> Optional[Incident]:
     for inc in world.incidents:
         if car is not None and inc.car == car:
             return inc
@@ -51,7 +53,7 @@ def _headline(inc: Incident) -> str:
     return inc.kind
 
 
-def _get_or_create(world: WorldState, track: Track, car: int | None, track_m: float,
+def _get_or_create(world: WorldState, track: Track, car: Optional[int], track_m: float,
                    kind: str, t_ms: int) -> tuple[Incident, bool]:
     inc = find_incident(world, track, car, track_m, t_ms)
     if inc:

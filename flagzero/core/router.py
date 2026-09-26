@@ -12,6 +12,8 @@ Never above the incident's maximum level. RED (5) only after Confirm red.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import math
 from dataclasses import dataclass
 
@@ -54,9 +56,9 @@ def level_for(dist_m: float, v_mps: float, max_level: int) -> int:
 @dataclass
 class CarWarning:
     level: int = NORMAL
-    incident: Incident | None = None
-    dist_m: float | None = None
-    eta_s: float | None = None
+    incident: Optional[Incident] = None
+    dist_m: Optional[float] = None
+    eta_s: Optional[float] = None
 
 
 def compute(world: WorldState, lap_len: float) -> dict[int, CarWarning]:

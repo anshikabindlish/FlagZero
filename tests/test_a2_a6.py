@@ -71,7 +71,8 @@ CAM_STOP = {"src": "CAMERA", "kind": "STOPPED_VEHICLE", "conf": 0.93}
     (_inc(IMU_IMPACT, still=True), 3),
     (_inc({"src": "CAMERA", "kind": "MULTI_STOP", "conf": 0.9}), 3),
     (_inc(IMU_IMPACT, CAM_STOP, still=True, countdown="TIMEOUT"), 4),
-    (_inc(IMU_IMPACT, still=True, countdown="TIMEOUT"), 3),             # no camera: only 2 signals
+    (_inc(IMU_IMPACT, still=True, countdown="TIMEOUT"), 4),             # no OK in 15 s -> auto red
+    (_inc(IMU_IMPACT, still=True, countdown="OK"), 3),
 ])
 def test_severity(inc, expected):
     assert severity(inc) == expected
@@ -123,7 +124,7 @@ def test_scene2_full_escalation(eng):
     e.on_vision({"type": "vision", "cars": [{"car": 17, "track_m": 1423.0}], "hazards": []},
                 t_ms=1000, now_s=1.0)
     out = e.on_car(17, {"type": "imu_event", "cls": "IMPACT", "peak_g": 5.2, "conf": 0.88}, t_ms=1100)
-    assert out == [(17, {"type": "countdown", "secs": 10, "peak_g": 5.2})]
+    assert out == [(17, {"type": "countdown", "secs": 15, "peak_g": 5.2})]
     inc = e.world.incidents[0]
     assert inc.severity == 2 and inc.track_m == pytest.approx(1423, abs=1)
     assert e.world.cars[17].state == "STOPPED"
@@ -136,17 +137,17 @@ def test_scene2_full_escalation(eng):
     assert len(e.world.incidents) == 1                  # same car -> same incident
     assert inc.fused_conf == pytest.approx(0.9916)
 
-    out = e.on_car(17, {"type": "countdown_result", "result": "TIMEOUT"}, t_ms=11200)
-    assert (17, {"type": "medical", "status": "URGENT"}) in out
-    assert inc.severity == 4 and e.world.red_pending
-
-    out = run_ticks(e, 1, 11200, 11.2)
+    out = run_ticks(e, 1, 3200, 3.2)
     lv21 = [m["level"] for c, m in out if c == 21 and m["type"] == "warning"]
-    assert lv21 and max(lv21) < router.RED               # no RED before confirmation
+    assert lv21 and max(lv21) < router.RED               # no RED while the countdown runs
     assert not any(c == 17 and m["type"] == "warning" for c, m in out)   # crashed car: no warnings
 
-    e.on_dash({"type": "confirm_red"}, PHONES)
-    out = run_ticks(e, 0.5, 12200, 12.2)
+    out = e.on_car(17, {"type": "countdown_result", "result": "TIMEOUT"}, t_ms=16200)
+    assert (17, {"type": "medical", "status": "URGENT"}) in out
+    assert inc.severity == 4
+    assert e.world.red_confirmed and e.world.red_auto and not e.world.red_pending   # automatic, no click
+
+    out = run_ticks(e, 0.5, 16200, 16.2)
     assert [m["level"] for c, m in out if c == 21 and m["type"] == "warning"][-1] == router.RED
     assert not any(c == 17 and m.get("level") == router.RED for c, m in out)
     assert e.world.state_message()["vitals"]["17"]["sim"] is True
@@ -164,12 +165,25 @@ def test_ok_pressed_means_monitor(eng):
     assert e.world.incidents[0].countdown == "OK"
 
 
-def test_server_times_out_silent_phone(eng):
+def test_server_times_out_silent_phone_and_raises_red(eng):
     e = eng
     e.on_car(17, {"type": "imu_event", "cls": "IMPACT", "peak_g": 6, "conf": 0.9}, t_ms=0)
     out = run_ticks(e, 14, 0, 0.0)
+    assert e.world.incidents[0].countdown == "PENDING"      # still inside the 15 s window
+    assert not e.world.red_confirmed
+    out = run_ticks(e, 5, 14000, 14.0)                       # phone never answers
     assert (17, {"type": "medical", "status": "URGENT"}) in out
     assert e.world.incidents[0].countdown == "TIMEOUT"
+    assert e.world.red_confirmed and e.world.red_auto
+
+
+def test_ok_within_15s_means_no_red(eng):
+    e = eng
+    e.on_car(17, {"type": "imu_event", "cls": "IMPACT", "peak_g": 6, "conf": 0.9}, t_ms=0)
+    e.on_car(17, {"type": "imu_update", "still": True}, t_ms=1500)
+    e.on_car(17, {"type": "ok_pressed"}, t_ms=12000)
+    run_ticks(e, 10, 12000, 12.0)
+    assert e.world.incidents[0].severity == 3 and not e.world.red_confirmed
 
 
 def test_vitals_ramp_after_impact(eng):

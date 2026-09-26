@@ -6,6 +6,8 @@ Scene 1 / Scene 2 flow can be checked without phones or a camera.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import logging
 import time
 
@@ -21,7 +23,7 @@ Out = list[tuple[int, dict]]
 
 
 class Engine:
-    def __init__(self, world: WorldState | None = None, seed: int | None = config.SIM_SEED):
+    def __init__(self, world: Optional[WorldState] = None, seed: Optional[int] = config.SIM_SEED):
         self.world = world or WorldState()
         self.sim = Simulation(self.world, seed=seed)
         self.latency = LatencyTracker()
@@ -36,7 +38,7 @@ class Engine:
         return self._msg_id
 
     # ------------------------------------------------------------ phones
-    def on_car(self, car: int, msg: dict, t_ms: int | None = None) -> Out:
+    def on_car(self, car: int, msg: dict, t_ms: Optional[int] = None) -> Out:
         t_ms = now_ms() if t_ms is None else t_ms
         kind = msg.get("type")
         msg.setdefault("car", car)
@@ -75,7 +77,7 @@ class Engine:
                 self.world.latency["last_detect_to_warn_ms"] = row["detect_to_ack_ms"]
                 self.world.latency["last_detect_to_sent_ms"] = row["detect_to_sent_ms"]
 
-    def pings(self, connected: set[int], t_ms: int | None = None) -> Out:
+    def pings(self, connected: set[int], t_ms: Optional[int] = None) -> Out:
         t_ms = now_ms() if t_ms is None else t_ms
         out = []
         for car in connected:
@@ -88,7 +90,7 @@ class Engine:
         return out
 
     # ------------------------------------------------------------ camera
-    def on_vision(self, msg: dict, t_ms: int | None = None, now_s: float | None = None) -> None:
+    def on_vision(self, msg: dict, t_ms: Optional[int] = None, now_s: Optional[float] = None) -> None:
         t_ms = now_ms() if t_ms is None else t_ms
         now_s = time.monotonic() if now_s is None else now_s
         for c in msg.get("cars", []) or []:
@@ -118,7 +120,7 @@ class Engine:
     def reset(self, connected: set[int]) -> Out:
         w = self.world
         w.incidents.clear()
-        w.red_pending = w.red_confirmed = False
+        w.red_pending = w.red_confirmed = w.red_auto = False
         self.sim.release_all()
         for c in w.cars.values():
             c.warning = 0
@@ -142,8 +144,8 @@ class Engine:
                  cars[21].track_m if 21 in cars else -1, cars[17].track_m if 17 in cars else -1)
 
     # ------------------------------------------------------------ main tick
-    def tick(self, dt: float, connected: set[int], now_s: float | None = None,
-             t_ms: int | None = None) -> Out:
+    def tick(self, dt: float, connected: set[int], now_s: Optional[float] = None,
+             t_ms: Optional[int] = None) -> Out:
         t_ms = now_ms() if t_ms is None else t_ms
         self.sim.tick(dt, now_s=now_s)
         out = medical.update(self.world, t_ms)

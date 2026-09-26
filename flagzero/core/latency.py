@@ -9,6 +9,8 @@ Report:  python3 -m flagzero.core.latency
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import csv
 import logging
 import statistics
@@ -25,7 +27,7 @@ class LatencyTracker:
     def __init__(self) -> None:
         self.pending: dict[int, dict] = {}     # warning msg id -> trial row
         self.done: set[tuple[int, int]] = set()   # (incident id, phone car) already measured
-        self.last: dict | None = None
+        self.last: Optional[dict] = None
 
     def warning_sent(self, msg_id: int, inc, to_car: int, level: int, t_ms: int) -> None:
         if level <= 0 or inc is None or inc.detect_ms is None or inc.car == to_car:
@@ -36,7 +38,7 @@ class LatencyTracker:
         self.pending[msg_id] = {"incident": inc.id, "kind": inc.kind, "to_car": to_car,
                                 "detect_ms": inc.detect_ms, "warn_sent_ms": t_ms}
 
-    def ack(self, msg_id: int, t_ms: int, rtt_ms: int | None) -> dict | None:
+    def ack(self, msg_id: int, t_ms: int, rtt_ms: Optional[int]) -> Optional[dict]:
         row = self.pending.pop(msg_id, None)
         if row is None:
             return None
