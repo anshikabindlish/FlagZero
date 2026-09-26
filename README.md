@@ -1,71 +1,80 @@
-# FlagZero
+# FlagZero v2
 
-Motorsport safety AI demo — an overhead camera + an IMU-and-vitals-carrying
-Arduino watch a paper "track," `/core` fuses what they see into a flag
-decision, `/dashboard` shows it, and the Arduino displays it trackside.
+Motorsport incident-detection demo: phones are car nodes, an overhead iPhone
+camera watches a paper track, and one FastAPI server fuses signals, sets
+severity, predicts who's approaching, and warns them before they arrive.
 
-## Layout
+## Roles / hardware
+
+| Who | Machine | Runs |
+|---|---|---|
+| A | — | `server.py`, `core/*` |
+| B (vision) | MacBook Air #1 | `server.py`, `vision.py`, `camera_test.py`, cloudflared tunnel |
+| — | iPhone #1 | Overhead camera via Continuity Camera |
+| — | iPhone #2 | Car #17 (crash car) — Safari, `/car?car=17` |
+| — | OnePlus 15R | Car #21 (approaching car) — Chrome, `/car?car=21` |
+| C (presenter) | MacBook Air #2 | Backup host, `/dashboard` |
+| — | ThinkPad (Windows) | Second dashboard, `/dashboard` |
+
+## Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+## Run — race control host (MacBook Air #1)
+
+```bash
+# Terminal 1: the server
+uvicorn flagzero.server:app --host 0.0.0.0 --port 8000 --reload
+
+# Terminal 2: public tunnel so phones off the LAN can reach it
+cloudflared tunnel --url http://localhost:8000
+
+# Terminal 3: vision pipeline (after confirming the camera index — see below)
+python -m flagzero.vision.vision --index <N>
+```
+
+## Run — find and test the overhead camera (MacBook Air #1)
+
+```bash
+# Scan indices 0-3, show a thumbnail per open camera
+python -m flagzero.vision.camera_test
+
+# Once you know the iPhone's index, preview it full-size / grab a still
+python -m flagzero.vision.camera_test --index 1
+```
+
+## Run — car / dashboard pages (any phone or laptop)
+
+Open in a browser, pointed at the tunnel URL or the host's LAN IP:
 
 ```
-flagzero/
-├── shared/      contracts everyone imports — schemas, track config, protocols
-├── core/        Person A — fusion, serial link, WebSocket server
-├── vision/      Person B — OpenCV detection over the Continuity Camera feed
-├── hardware/    Person C (1/2) — Arduino UNO sketch
-└── dashboard/   Person C (2/2) — browser UI
+http://<host>:8000/car?car=17      # iPhone #2, car #17
+http://<host>:8000/car?car=21      # OnePlus 15R, car #21
+http://<host>:8000/dashboard       # MacBook Air #2, ThinkPad
+http://<host>:8000/join            # anyone joining mid-demo
 ```
 
-Each folder has its own README with details; the table below is the fast
-path to get all four stubs running side by side.
+## Simulate without hardware
 
-## Run everything (stub versions)
+```bash
+python -m flagzero.tools.mock_car --car 17
+python -m flagzero.tools.mock_vision
+python -m flagzero.tools.replay <recorded_run.json>
+python -m flagzero.sim.montecarlo --n 10000
+```
 
-| Module | Command |
-|---|---|
-| core | `pip install -r core/requirements.txt && python -m core.fake_event_generator` |
-| vision | `pip install -r vision/requirements.txt && python -m vision.stub_detector` |
-| hardware | open `hardware/flagzero_stub/flagzero_stub.ino` in the Arduino IDE, select **Arduino Uno**, upload |
-| dashboard | open `dashboard/index.html` in a browser while core is running |
+## Conventions
 
-Run the Python modules from the **repo root**, not from inside their own
-folder — `shared` needs to resolve as a sibling package (that's what the
-`python -m core.fake_event_generator` form buys you over
-`python core/fake_event_generator.py`).
-
-Start core first, then dashboard (it auto-reconnects every 2s if it can't
-connect yet, so order isn't critical, just convenient).
-
-## Needs your confirmation before H1
-
-1. **Track length** — defaulted to **5000 m** in `shared/track_config.json`
-   (a round number; T4 at 1423 m sits about 28.5% of the way around the
-   lap). Edit that one file if you want a different length — nothing else
-   in the repo hardcodes it.
-2. **Severity ↔ label mapping** — the brief listed 6 labels
-   (`NORMAL … RED_FLAG_RECOMMENDED` plus `SLOW_ZONE`) against 5 severity
-   rungs (0–4). I mapped 5 of them onto the rungs 1:1 and treated
-   `SLOW_ZONE` as an orthogonal/local state rather than a rung of its own —
-   see the comment above `SEVERITY_LABELS` in `shared/schemas.py`. Say the
-   word if you want a different mapping and I'll adjust it there.
-3. **`car_id` when one Arduino plays multiple cars** — the UNO's telemetry
-   JSON never includes `car_id`; `/core` is meant to tag it per
-   `core/scene_config.json` instead, so switching which car a scene
-   represents is a laptop-side edit, not a re-flash. Flag it if you'd
-   rather the firmware carry `car_id` itself.
-4. **LCD wiring** — `hardware/PINOUT.md` assumes a 1602A on an I2C backpack
-   (2 wires) rather than parallel HD44780 (6+ digital pins), since that's
-   what's in most starter kits. If yours is parallel, say so and I'll redo
-   the pinout and the sketch's LCD calls.
-5. **Baud rate** — 115200, arbitrary but must match on both ends; change
-   freely as long as the UNO sketch and whatever reads it on the laptop
-   agree.
-
-## Contracts at a glance
-
-- **Incident** (`shared/incident.schema.json`) — one raw detection, IMU or
-  camera-origin.
-- **Decision** (`shared/decision.schema.json`) — the fused flag state.
-- **WebSocket messages** (`shared/ws_messages.md`) — `incident`,
-  `severity_update`, `eta_update`, `monte_carlo_result`, all core⟷dashboard.
-- **Serial protocol** (`shared/serial_protocol.md`) — short text commands
-  laptop→UNO, small JSON UNO→laptop.
+- All timestamps are milliseconds; the **server** stamps receive time — every
+  latency figure downstream uses server time, not client clocks.
+- Every tunable number lives in `flagzero/config.py` — no magic numbers
+  elsewhere.
+- Cross-platform: use `pathlib`, no OS-specific shell-outs.
+- Warning levels (phones): `0 NORMAL, 1 CAUTION, 2 YELLOW, 3 DBL YELLOW,
+  4 SLOW ZONE, 5 RED`.
+- Severity levels (race control): `0-4`, where `4` = RED FLAG RECOMMENDED.
+  RED only shows on phones after race control clicks **Confirm Red**.

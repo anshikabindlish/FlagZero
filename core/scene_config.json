@@ -1,4 +1,0 @@
-{
-  "_comment": "Which car_id the single physical Arduino rig currently represents. Update this between demo scenes/takes -- nothing about the firmware needs to change when you do. See shared/serial_protocol.md for why this lives here instead of on the UNO.",
-  "active_car_id": 17
-}
