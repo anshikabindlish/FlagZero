@@ -129,6 +129,26 @@ def _countdown_result(world: WorldState, car: int, result: str, t_ms: int) -> li
     return out
 
 
+def handle_driver_request(world: WorldState, msg: dict, t_ms: int) -> str:
+    """Phone buttons after an impact (docs/phone_changes.md).
+
+    RED_FLAG: the driver recommends red -> DRIVER source on their incident(s).
+    FALSE_ALARM: it was only a wobble -> returns "clear" if nothing is at red
+    yet, so the engine resets everything; ignored once red is out or recommended.
+    """
+    car = int(msg["car"])
+    req = str(msg.get("request", "")).upper()
+    mine = [inc for inc in world.incidents if inc.car == car]
+    if req == "RED_FLAG":
+        for inc in mine:
+            _upsert_source(inc, {"src": "DRIVER", "kind": "RED_FLAG", "conf": None, "ms": t_ms})
+            inc.updated_ms = t_ms
+        return "red"
+    if req == "FALSE_ALARM" and mine and not world.red_confirmed             and all(inc.severity < 4 for inc in world.incidents):
+        return "clear"
+    return ""
+
+
 def handle_vision(world: WorldState, sim, msg: dict, t_ms: int) -> None:
     """Camera hazards. Car positions were already applied to the sim."""
     for h in msg.get("hazards", []) or []:

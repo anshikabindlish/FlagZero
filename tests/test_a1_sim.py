@@ -3,10 +3,13 @@ import pytest
 
 from flagzero import config
 from flagzero.core.state import CAMERA, RUNNING, STOPPED
-from flagzero.core.track import default_track, upstream_distance, wrap
+from flagzero.core.track import default_track, load_track, upstream_distance, wrap
 from flagzero.sim.sim import Simulation
 
 LAP = 4000.0
+# These tests were written for the generic 4,000 m circuit, kept as track_generic.json.
+# The live track.json is now the real Interlagos (see test_interlagos_track below).
+GENERIC = load_track(config.PACKAGE_DIR / "track_generic.json")
 
 
 # ---------------------------------------------------------------- upstream_distance
@@ -28,7 +31,7 @@ def test_wrap():
 
 # ---------------------------------------------------------------- track
 def test_track_basics():
-    t = default_track()
+    t = GENERIC
     assert t.lap_length_m == 4000
     t4 = t.corner("T4")
     assert t4.s == 1423 and t4.sightline_m == 90
@@ -41,7 +44,18 @@ def test_track_basics():
 
 # ---------------------------------------------------------------- simulation
 def make_sim():
-    return Simulation(seed=7)
+    return Simulation(seed=7, track=GENERIC)
+
+
+def test_interlagos_track():
+    t = default_track()
+    assert "Interlagos" in t.raw["name"]
+    assert [c.name for c in t.corners] == [f"T{i}" for i in range(1, 16)]
+    t4 = t.corner("T4")
+    assert 1300 < t4.s < 1450 and t4.sightline_m == 90
+    assert t.raw["paper_track"]["corner"] == "T4"
+    assert t.raw["paper_track"]["from_m"] < t4.s < t.raw["paper_track"]["to_m"]
+    assert t.nearest_corner(t4.s + 20).name == "T4"
 
 
 def test_spawn():

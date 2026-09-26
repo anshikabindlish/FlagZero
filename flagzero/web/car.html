@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#111111" />
+<title>FlagZero car node</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #111; color: #fff;
+    font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+    -webkit-user-select: none; user-select: none; overflow: hidden; }
+  .hidden { display: none !important; }
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 16px; }
+
+  #start h1 { font-size: 2.4rem; margin: 0 0 .25rem; letter-spacing: .05em; }
+  #start .car { font-size: 1.3rem; opacity: .8; margin-bottom: 2rem; }
+  #startBtn { font-size: 2rem; font-weight: 800; padding: 1.2rem 3rem; border: 0;
+    border-radius: 1rem; background: #0b7a2a; color: #fff; }
+  #start .small { font-size: .9rem; opacity: .6; margin-top: 1.5rem; max-width: 22rem; }
+
+  #dash { transition: background .15s; background: #0b7a2a; }
+  #dash.flash { animation: flash .5s steps(1) infinite; }
+  @keyframes flash { 0% { background: #ffd400; } 50% { background: #222; } }
+  #topbar { position: absolute; top: 0; left: 0; right: 0; display: flex;
+    justify-content: space-between; padding: 12px 16px; font-weight: 700; font-size: 1.1rem; }
+  #link.ok { color: #7CFC00; } #link.bad { color: #fff; background: #000; padding: 0 .4rem; border-radius: .3rem; }
+  #flag { font-size: 3.2rem; font-weight: 900; line-height: 1.05; }
+  #where { font-size: 2.2rem; font-weight: 700; margin-top: .6rem; }
+  #dist { font-size: 4.5rem; font-weight: 900; margin-top: .4rem; }
+  #sub { font-size: 1.1rem; font-weight: 600; margin-top: .6rem; }
+  #debug { position: absolute; bottom: 8px; left: 8px; right: 8px; font: 11px ui-monospace, Menlo, monospace;
+    opacity: .75; text-align: left; white-space: pre; }
+  #testBtn { position: absolute; bottom: 56px; right: 12px; font-size: .8rem; padding: .4rem .7rem;
+    border-radius: .4rem; border: 1px solid rgba(255,255,255,.5); background: rgba(0,0,0,.35); color: #fff; }
+
+  #cd { background: #b00020; }
+  #cd.flash { animation: cdflash .5s steps(1) infinite; }
+  @keyframes cdflash { 0% { background: #b00020; } 50% { background: #300; } }
+  #cdTitle { font-size: 2rem; font-weight: 900; }
+  #cdInfo { font-size: 1.2rem; margin-top: .3rem; opacity: .9; }
+  #cdNum { font-size: 7rem; font-weight: 900; line-height: 1; margin: 1rem 0; }
+  #cdResult { font-size: 1.4rem; font-weight: 800; margin: .8rem 0 1.2rem; }
+  #cdButtons { display: flex; flex-direction: column; gap: .8rem; width: min(22rem, 100%); }
+  #cdButtons button { font-size: 1.3rem; font-weight: 800; padding: 1rem; border-radius: .9rem; border: 3px solid #fff; color: #fff; }
+  #cdButtons .big { font-size: 2rem; padding: 1.3rem 1rem; }
+  #okBtn { background: #fff; color: #b00020 !important; border-color: #fff; }
+  #falseBtn { background: #0b7a2a; }
+  #redBtn { background: #d50000; }
+  #continueBtn { background: transparent; font-size: 1rem !important; border-width: 2px !important; opacity: .85; }
+
+  #greenBtn { position: fixed; bottom: 56px; left: 12px; z-index: 10; background: #0b7a2a; color: #fff;
+    border: 2px solid #fff; padding: .6rem .9rem; border-radius: .5rem; font-weight: 800; font-size: .95rem; }
+</style>
+</head>
+<body>
+  <div id="start" class="screen">
+    <h1>FLAGZERO</h1>
+    <div class="car" id="startCar">Car #--</div>
+    <button id="startBtn">START</button>
+    <div class="small">Tapping START allows motion sensors and sound, and keeps the screen awake. Keep this page open during the demo.</div>
+  </div>
+
+  <div id="dash" class="screen hidden">
+    <div id="topbar"><span id="carTag">#--</span><span id="link" class="bad">CONNECTING</span></div>
+    <div id="flag">TRACK CLEAR</div>
+    <div id="where"></div>
+    <div id="dist"></div>
+    <div id="sub"></div>
+    <button id="testBtn">test crash</button>
+    <div id="debug"></div>
+  </div>
+
+  <div id="cd" class="screen hidden">
+    <div id="cdTitle">IMPACT DETECTED</div>
+    <div id="cdInfo"></div>
+    <div id="cdNum">15</div>
+    <div id="cdResult"></div>
+    <div id="cdButtons">
+      <button id="okBtn" class="big">I'M OK</button>
+      <button id="falseBtn" class="big">FALSE ALARM · GREEN FLAG</button>
+      <button id="redBtn">RECOMMEND RED FLAG</button>
+      <button id="continueBtn">CONTINUE UNDER YELLOW</button>
+    </div>
+  </div>
+
+  <button id="greenBtn" class="hidden">RACE CONTROL · GREEN FLAG</button>
+
+  <script src="/car.js"></script>
+</body>
+</html>

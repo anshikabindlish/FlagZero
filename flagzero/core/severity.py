@@ -11,6 +11,10 @@ Team change: with AUTO_RED_ON_TIMEOUT, a driver who does not press I'm OK
 within COUNTDOWN_S (15 s) makes the incident severity 4 on its own, and RED
 goes out automatically. Race control can still Confirm red by hand for any
 other severity-4 incident.
+
+Team change: a responsive driver can press RECOMMEND RED FLAG on the phone
+(a DRIVER source). That makes the incident severity 4 -> RED FLAG RECOMMENDED,
+but it still waits for race control's Confirm red (no automatic red).
 """
 from __future__ import annotations
 
@@ -57,6 +61,8 @@ def severity(inc: Incident) -> int:
         lvl = 4
     if config.AUTO_RED_ON_TIMEOUT and inc.countdown == "TIMEOUT":
         lvl = 4
+    if any(s["src"] == "DRIVER" and s["kind"] == "RED_FLAG" for s in inc.sources):
+        lvl = 4                                   # driver recommends red: pending Confirm red
     return lvl
 
 

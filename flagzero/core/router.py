@@ -4,7 +4,7 @@ For every car upstream of a hazard (within 2,000 m):
     ETA    = dist / v
     d_need = v*t_react + max(0, v^2 - v_safe^2) / (2a)
     margin = dist - d_need
-    ETA < 6 s or margin < 100 m -> the incident's maximum level
+    ETA < 6 s or margin < 100 m or within 500 m (flag zone) -> the incident's maximum level
     6-20 s  -> YELLOW
     20-40 s -> CAUTION
     > 40 s  -> none
@@ -42,7 +42,9 @@ def level_for(dist_m: float, v_mps: float, max_level: int) -> int:
         return NORMAL
     eta = eta_s(dist_m, v_mps)
     margin = dist_m - d_need(v_mps)
-    if eta < config.ROUTER_ETA_MAX_LEVEL_S or margin < config.ROUTER_MARGIN_M:
+    # Inside the flag zone the marshal posts show the incident's flag whatever the ETA; this also
+    # stops a car slowed by the DBL YELLOW speed cap from dropping back to YELLOW and speeding up.
+    if eta < config.ROUTER_ETA_MAX_LEVEL_S or margin < config.ROUTER_MARGIN_M             or dist_m <= config.ROUTER_FLAG_ZONE_M:
         lvl = max_level
     elif eta < config.ROUTER_ETA_YELLOW_S:
         lvl = YELLOW

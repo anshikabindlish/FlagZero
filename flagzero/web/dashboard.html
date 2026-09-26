@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FlagZero race control</title>
+<style>
+  :root {
+    --bg: #0d0f12; --panel: #161a20; --line: #2a313b; --text: #e8ecf1; --muted: #8a95a3;
+    --green: #1f9d4c; --caution: #b08a00; --yellow: #ffd400; --slow: #ff9800; --red: #e0262b; --blue: #4aa3ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; font-size: 17px; }
+  header { display: flex; align-items: center; gap: 1rem; padding: .8rem 1.2rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 1.3rem; margin: 0; letter-spacing: .08em; }
+  header .grow { flex: 1; }
+  #conn { font-weight: 700; font-size: .9rem; }
+  #conn.ok { color: #7CFC00; } #conn.bad { color: var(--red); }
+  #clock { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .9rem; }
+  button { font: inherit; font-weight: 700; border-radius: .5rem; border: 1px solid var(--line);
+    background: #232a33; color: var(--text); padding: .45rem .9rem; cursor: pointer; }
+  button:hover { filter: brightness(1.2); }
+  button.small { font-size: .75rem; padding: .2rem .5rem; }
+
+  .bar { display: none; align-items: center; gap: 1.2rem; padding: 1rem 1.2rem; color: #fff; font-size: 1.6rem; font-weight: 900; }
+  .bar.show { display: flex; }
+  .bar .grow { flex: 1; font-size: 1.1rem; font-weight: 700; }
+  #redBanner { background: var(--red); animation: pulse 1s infinite; }
+  #redActive { background: #9b0f13; }
+  #confirmRed { background: #fff; color: var(--red); border: 0; font-size: 1.3rem; padding: .7rem 1.4rem; }
+  @keyframes pulse { 50% { filter: brightness(.8); } }
+
+  main { display: grid; gap: 1rem; padding: 1rem 1.2rem;
+    grid-template-columns: 1fr 1.3fr .9fr;
+    grid-template-areas: "incident approach driver" "map map side"; }
+  #incident { grid-area: incident; } #approach { grid-area: approach; } #driver { grid-area: driver; }
+  #mapPanel { grid-area: map; } #side { grid-area: side; display: flex; flex-direction: column; gap: 1rem; }
+  @media (max-width: 1250px) { main { grid-template-columns: 1fr 1fr; grid-template-areas: "incident approach" "driver side" "map map"; } }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; grid-template-areas: "incident" "approach" "driver" "side" "map"; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: .8rem; padding: 1rem 1.2rem; min-width: 0; }
+  .panel h2 { margin: 0 0 .8rem; font-size: .85rem; letter-spacing: .12em; color: var(--muted); text-transform: uppercase;
+    display: flex; align-items: center; gap: .6rem; }
+  .panel h2 .grow { flex: 1; }
+  .none { color: var(--muted); font-size: 1.1rem; padding: 1rem 0; }
+
+  /* panel 1: incident */
+  .sev { display: inline-block; font-weight: 900; font-size: 1.3rem; padding: .3rem .8rem; border-radius: .4rem; }
+  .kind { font-size: 2rem; font-weight: 900; margin: .6rem 0 .2rem; }
+  .where { font-size: 1.3rem; color: var(--muted); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: .35rem 1rem; margin-top: 1rem; font-size: 1.05rem; align-items: center; }
+  .kv .k { color: var(--muted); }
+  .conf { font-size: 2.4rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .chip { display: inline-block; padding: .15rem .55rem; border-radius: 999px; font-size: .8rem; font-weight: 800;
+    margin: 0 .3rem .3rem 0; border: 1px solid currentColor; }
+  .chip.IMU { color: var(--blue); } .chip.CAMERA { color: #c38cff; } .chip.NO_RESPONSE { color: var(--red); }
+  .chip.DRIVER { color: var(--slow); } .chip.TEST { color: var(--muted); }
+  .med-URGENT { color: var(--red); font-weight: 900; } .med-MONITOR { color: var(--yellow); font-weight: 800; }
+  .others { margin-top: 1rem; color: var(--muted); font-size: .9rem; }
+
+  /* panel 2: approaching cars */
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: .8rem; color: var(--muted); font-weight: 700; padding: .4rem .5rem; border-bottom: 1px solid var(--line); }
+  td { padding: .55rem .5rem; border-bottom: 1px solid #1f252d; font-size: 1.1rem; }
+  td.car { font-weight: 900; font-size: 1.25rem; }
+  .lvl { display: inline-block; min-width: 7.5rem; text-align: center; font-weight: 900; padding: .2rem .5rem; border-radius: .35rem; font-size: .95rem; }
+  .l0 { background: #1b2a20; color: #6fcf8f; } .l1 { background: var(--caution); color: #fff; }
+  .l2 { background: var(--yellow); color: #111; } .l3 { background: var(--yellow); color: #111; box-shadow: inset 0 0 0 3px #111; }
+  .l4 { background: var(--slow); color: #111; } .l5 { background: var(--red); color: #fff; }
+  tr.phone td.car::after { content: " 📱"; font-size: .9rem; }
+
+  /* panel 3: driver status */
+  .badge { font-size: .7rem; font-weight: 900; letter-spacing: .08em; padding: .1rem .45rem; border-radius: .3rem;
+    background: #3a2f00; color: var(--yellow); border: 1px solid var(--yellow); }
+  .vitals { display: flex; gap: 1.5rem; margin: .4rem 0 .6rem; }
+  .vital .big { font-size: 2.6rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .vital .unit { color: var(--muted); font-size: .9rem; margin-left: .3rem; }
+  .heart { color: var(--red); }
+  .resp { display: inline-block; font-weight: 900; padding: .2rem .6rem; border-radius: .35rem; }
+  .resp.WAITING { background: var(--yellow); color: #111; animation: pulse .8s infinite; }
+  .resp.OK { background: var(--green); color: #fff; }
+  .resp.NO_RESPONSE { background: var(--red); color: #fff; }
+  .countdown { font-size: 2rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+  /* canvases */
+  #map { width: 100%; height: 440px; display: block; }
+  #trace { width: 100%; height: 190px; display: block; }
+  .legend { color: var(--muted); font-size: .8rem; margin-top: .4rem; }
+  .legend span { margin-right: 1rem; }
+
+  /* panel 7: latency */
+  .lat { display: grid; grid-template-columns: auto 1fr; gap: .3rem 1rem; font-variant-numeric: tabular-nums; }
+  .lat .k { color: var(--muted); }
+  .lat .v { font-weight: 800; }
+  .lat .hero { font-size: 1.8rem; font-weight: 900; }
+  .note { color: var(--muted); font-size: .75rem; margin-top: .5rem; }
+
+  footer { display: flex; gap: .6rem; align-items: center; padding: 0 1.2rem 1.2rem; color: var(--muted); font-size: .85rem; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>FLAGZERO · RACE CONTROL</h1>
+    <span id="conn" class="bad">CONNECTING</span>
+    <span class="grow"></span>
+    <span id="clock"></span>
+  </header>
+
+  <div id="redBanner" class="bar">
+    <span>⚠ RED FLAG RECOMMENDED</span>
+    <span class="grow" id="redWhy"></span>
+    <button id="confirmRed">CONFIRM RED</button>
+  </div>
+  <div id="redActive" class="bar">
+    <span>■ RED FLAG OUT</span>
+    <span class="grow" id="redActiveWhy"></span>
+  </div>
+
+  <main>
+    <section class="panel" id="incident"><h2>Active incident</h2><div id="incidentBody"></div></section>
+    <section class="panel" id="approach"><h2>Approaching cars · sorted by ETA</h2><div id="approachBody"></div></section>
+    <section class="panel" id="driver"><h2><span class="grow" id="driverTitle">Driver status</span><span class="badge">SIM VITALS</span></h2><div id="driverBody"></div></section>
+    <section class="panel" id="mapPanel">
+      <h2>Track · <span id="trackSrc">built-in layout</span></h2>
+      <canvas id="map"></canvas>
+      <div class="legend"><span>● car (colour = its warning)</span><span>◎ phone car</span><span style="color:#4aa3ff">▬ paper track (camera view)</span><span style="color:#ff5a5f">▲ hazard</span></div>
+    </section>
+    <div id="side">
+      <section class="panel"><h2><span class="grow" id="traceTitle">Live g-force · car #17</span></h2><canvas id="trace"></canvas></section>
+      <section class="panel"><h2><span class="grow">Latency</span><button class="small" id="clearTrials">clear trials</button></h2><div id="latencyBody"></div></section>
+    </div>
+  </main>
+
+  <footer>
+    <button id="resetBtn">RESET · GREEN FLAG</button>
+    <button data-scene="1">Scene 1</button>
+    <button data-scene="2">Scene 2</button>
+    <span id="modeNote"></span>
+  </footer>
+
+  <script src="/dashboard.js"></script>
+</body>
+</html>

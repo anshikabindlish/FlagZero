@@ -59,6 +59,12 @@ class Engine:
             out += incidents.handle_ok_pressed(self.world, msg, t_ms)
         elif kind == "countdown_result":
             out += incidents.handle_countdown_result(self.world, msg, t_ms)
+        elif kind == "driver_request":                 # docs/phone_changes.md
+            if incidents.handle_driver_request(self.world, msg, t_ms) == "clear":
+                log.info("car %s: false alarm -> green flag", car)
+                out += self.reset(set(self.world.car_sockets) | {car})
+        elif kind == "green_flag":                     # phone's race-control button = dashboard reset
+            out += self.reset(set(self.world.car_sockets) | {car})
         if kind not in ("tel", "ack"):
             log.info("car %s -> %s", car, msg)
         severity.update(self.world)

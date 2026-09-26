@@ -31,6 +31,7 @@ ROUTER_T_REACT_S = 1.0
 ROUTER_V_SAFE_KMH = 80.0
 ROUTER_BRAKE_G = 1.2
 ROUTER_MARGIN_M = 100.0
+ROUTER_FLAG_ZONE_M = 500.0      # inside this distance a car always sees the incident's flag (marshal-post sector)
 ROUTER_ETA_MAX_LEVEL_S = 6.0
 ROUTER_ETA_YELLOW_S = 20.0
 ROUTER_ETA_CAUTION_S = 40.0
@@ -47,7 +48,7 @@ STOPPING_CLASSES = ("IMPACT", "SEVERE", "ROLLOVER")   # these stop the car + sta
 WARNING_LABELS = {0: "NORMAL", 1: "CAUTION", 2: "YELLOW", 3: "DBL YELLOW", 4: "SLOW ZONE", 5: "RED"}
 SEVERITY_LABELS = {0: "NORMAL", 1: "CAUTION", 2: "YELLOW", 3: "DOUBLE_YELLOW", 4: "RED_FLAG_RECOMMENDED"}
 SEVERITY_MAX_WARNING = {1: 1, 2: 2, 3: 3, 4: 4}   # sev 3 -> DBL YELLOW, sev 4 -> SLOW ZONE
-SPEED_CAP_KMH = {4: 80.0, 5: 60.0}                 # sim cars obey SLOW ZONE and RED
+SPEED_CAP_KMH = {3: 120.0, 4: 80.0, 5: 60.0}       # sim cars obey DBL YELLOW, SLOW ZONE and RED
 
 # ---------------------------------------------------------------- medical (A4)
 COUNTDOWN_S = 15                 # driver has 15 s to press I'm OK
@@ -59,8 +60,9 @@ HR_RAMP_S = 5.0
 SPO2 = (96, 98)
 
 # ---------------------------------------------------------------- demo scenes (A4)
-SCENE_CAR21_BEFORE_T4_M = 700.0  # car 21 starts this far before T4 (~15 s away)
-SCENE_CAR17_AT_M = 1300.0        # car 17 waits just before the paper track
+SCENE_CAR21_BEFORE_T4_M = 1300.0 # car 21 starts this far before T4 (Interlagos: ~9 s behind car 17)
+SCENE_CAR17_AT_M = 590.0         # car 17 starts ~800 m (~12 s) before T4, so a phone crash can land at T4;
+                                 # once the camera sees the pink car it owns car 17's position anyway
 
 # ---------------------------------------------------------------- marshal baseline (A4/A5)
 MARSHAL_SEE_VISIBLE_S = (0.2, 1.0)   # post can see the spot
