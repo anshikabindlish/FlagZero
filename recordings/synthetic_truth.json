@@ -1,0 +1,15 @@
+{
+  "fps": 30,
+  "events": {
+    "spin_start_s": 5.5,
+    "car17_stops_s": 6.5,
+    "car8_dash_s": 6.8,
+    "car8_stops_s": 8.4,
+    "hand_s": [
+      10.0,
+      11.5
+    ],
+    "debris_drop_s": 11.0,
+    "debris_track_m": 1455.0
+  }
+}
