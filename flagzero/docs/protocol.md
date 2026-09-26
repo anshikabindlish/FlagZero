@@ -129,7 +129,13 @@ detection.
               "track_m": 1423, "conf": 0.93}],
  "occluded": false}
 ```
-`cars` reports every tracked car's position on track. `hazards` is the
+`cars` reports every tracked car's position on track (additive fields from
+the vision pipeline: `speed_kmh`, `heading_err_deg`, `yaw_rate_dps`, `lateral`,
+`off_track`, `risk`, `visible`, `src`). Hazards may also carry `predicted`
+(bool) and `detail`, and besides `STOPPED_VEHICLE | DEBRIS | MULTI_STOP` the
+camera sends predictive kinds raised while a car is still moving:
+`SPIN_RISK`, `CLOSING` and `OFF_TRACK` (severity 2), and `SLOWING`
+(low confidence, so severity 1). See `flagzero/vision/README.md` §3. `hazards` is the
 current list of active hazards (present only while true, dropped once
 cleared -- not a one-off event). `car` is omitted on a `DEBRIS` hazard
 (debris isn't tied to a specific car). `occluded: true` means a hand/object

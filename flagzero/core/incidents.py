@@ -12,9 +12,12 @@ from flagzero.core.state import Incident, WorldState
 from flagzero.core.track import Track, upstream_distance
 
 IMU_KINDS = {"KERB", "SPIN", "IMPACT", "SEVERE", "ROLLOVER"}
-CAMERA_KINDS = {"STOPPED_VEHICLE", "DEBRIS", "MULTI_STOP"}
+CAMERA_KINDS = {"STOPPED_VEHICLE", "DEBRIS", "MULTI_STOP",
+                # predictive (vision/hazards.py): raised while the car is still moving
+                "SPIN_RISK", "CLOSING", "OFF_TRACK", "SLOWING"}
 # headline kind priority when several sources agree
-KIND_RANK = ["ROLLOVER", "SEVERE", "IMPACT", "MULTI_STOP", "STOPPED_VEHICLE", "SPIN", "DEBRIS", "KERB"]
+KIND_RANK = ["ROLLOVER", "SEVERE", "IMPACT", "MULTI_STOP", "STOPPED_VEHICLE", "SPIN", "SPIN_RISK",
+             "OFF_TRACK", "CLOSING", "DEBRIS", "SLOWING", "KERB"]
 
 
 def _dist(a: float, b: float, lap: float) -> float:
@@ -157,7 +160,8 @@ def handle_vision(world: WorldState, sim, msg: dict, t_ms: int) -> None:
         car = h.get("car")
         car = int(car) if car is not None else None
         inc, _ = _get_or_create(world, sim.track, car, float(h["track_m"]), kind, t_ms)
-        _upsert_source(inc, {"src": "CAMERA", "kind": kind, "conf": float(h.get("conf", 0.5)), "ms": t_ms})
+        _upsert_source(inc, {"src": "CAMERA", "kind": kind, "conf": float(h.get("conf", 0.5)), "ms": t_ms,
+                             "predicted": bool(h.get("predicted", False))})
         inc.track_m = float(h["track_m"])            # the camera's location is the precise one
         inc.corner = sim.track.nearest_corner(inc.track_m).name
         inc.kind = _headline(inc)

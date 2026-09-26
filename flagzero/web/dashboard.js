@@ -185,7 +185,7 @@ function renderIncident(s, inc, count) {
     : inc.severity >= 4 && s.red_pending ? "RED FLAG RECOMMENDED" : (inc.label || sev.name).replace(/_/g, " ");
   const chips = (inc.sources || []).map((x) => {
     const name = typeof x === "string" ? x : x.src;
-    const detail = typeof x === "string" ? "" : [x.kind && x.kind !== name ? x.kind : "", x.conf != null ? Math.round(x.conf * 100) + "%" : ""].filter(Boolean).join(" ");
+    const detail = typeof x === "string" ? "" : [x.kind && x.kind !== name ? x.kind : "", x.conf != null ? Math.round(x.conf * 100) + "%" : "", x.predicted ? "predicted" : ""].filter(Boolean).join(" ");
     return `<span class="chip ${esc(name)}">${esc(String(name).replace("_", "-"))}${detail ? " · " + esc(detail) : ""}</span>`;
   }).join("");
   const label = inc.corner_label || cornerLabel(inc.corner);

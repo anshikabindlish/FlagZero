@@ -2,7 +2,9 @@
 
 0  nothing
 1  IMU KERB, or any single source with confidence < 0.6
-2  SPIN; mild IMPACT; camera STOPPED_VEHICLE alone; DEBRIS
+2  SPIN; mild IMPACT; camera STOPPED_VEHICLE alone; DEBRIS;
+   camera SPIN_RISK / CLOSING / OFF_TRACK (predictive: yellow while the car is still moving;
+   low-confidence predicted OFF_TRACK and SLOWING stay at 1 via the lone-low-confidence rule)
 3  strong IMPACT or ROLLOVER; IMPACT followed by still:true; MULTI_STOP
 4  level 3 AND countdown TIMEOUT AND camera confirms a stationary vehicle
    (at least 3 corroborating signals)  -> RED FLAG RECOMMENDED
@@ -44,7 +46,7 @@ def severity(inc: Incident) -> int:
     lvl = 0
     if "KERB" in imu_kinds:
         lvl = max(lvl, 1)
-    if imu_kinds & {"SPIN", "IMPACT"} or cam_kinds & {"STOPPED_VEHICLE", "DEBRIS"}:
+    if imu_kinds & {"SPIN", "IMPACT"} or cam_kinds & {"STOPPED_VEHICLE", "DEBRIS", "SPIN_RISK", "CLOSING", "OFF_TRACK"}:
         lvl = max(lvl, 2)
     if strong_impact or "ROLLOVER" in imu_kinds or "MULTI_STOP" in cam_kinds \
             or (any_impact and inc.still):

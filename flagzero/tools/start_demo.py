@@ -10,6 +10,8 @@ https address, then opens the dashboard and the QR join page. Ctrl+C stops both.
 Options:
     --no-tunnel   server only (phones on the same Wi-Fi can't use motion sensors without https)
     --no-browser  don't open browser tabs
+    --vision N    also start the overhead camera pipeline on camera index N
+                  (find N with: python -m flagzero.vision.camera_test)
 """
 from __future__ import annotations
 
@@ -104,6 +106,7 @@ def main() -> None:
     ap.add_argument("--no-tunnel", action="store_true")
     ap.add_argument("--no-browser", action="store_true")
     ap.add_argument("--port", type=int, default=PORT)
+    ap.add_argument("--vision", type=int, metavar="N", help="also run the camera pipeline on camera index N")
     args = ap.parse_args()
     PORT = args.port
 
@@ -124,6 +127,11 @@ def main() -> None:
         sys.exit(1)
 
     local_dash = f"http://localhost:{PORT}/dashboard"
+    if args.vision is not None:
+        print(f"Starting the camera pipeline on camera {args.vision} (preview window opens) ...", flush=True)
+        procs.append(subprocess.Popen(
+            [sys.executable, "-m", "flagzero.vision.vision", "--index", str(args.vision),
+             "--url", f"ws://127.0.0.1:{PORT}/ws/vision"], cwd=ROOT))
     tunnel_url: str | None = None
     if not args.no_tunnel:
         exe = find_cloudflared()

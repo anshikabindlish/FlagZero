@@ -30,7 +30,8 @@ Windows: double-click **`start_demo.bat`**. Mac: double-click **`start_demo.comm
 (or `python3 -m flagzero.tools.start_demo`). It starts the server and an https
 tunnel, waits until the tunnel is live, prints the phone links, and opens the
 dashboard and the QR join page. Scan the QR codes once it says **READY**.
-Ctrl+C in that window stops everything.
+Ctrl+C in that window stops everything. Add the overhead camera with
+`start_demo.bat --vision N` (find N with `python -m flagzero.vision.camera_test`).
 
 ## Run — race control host by hand (MacBook Air #1)
 
@@ -72,8 +73,10 @@ http://<host>:8000/join            # anyone joining mid-demo
 python -m flagzero.tools.mock_car --car 17          # keyboard fake phone (i = impact, o = ok, x = timeout, ...)
 python -m flagzero.tools.scene_check 2              # plays a whole scene against the running server
 python -m pytest -q                                 # all tests
-python -m flagzero.tools.mock_vision
-python -m flagzero.tools.replay <recorded_run.json>
+python -m flagzero.tools.mock_vision                # keyboard fake camera (s/d/m/p/o/l/h/c)
+python -m flagzero.tools.make_test_video            # synthetic overhead clip + calibration, then:
+python -m flagzero.vision.vision --source flagzero/recordings/synthetic.mp4 --calib flagzero/recordings/synthetic_calib.json
+python -m flagzero.tools.replay --jsonl flagzero/recordings/<ts>.jsonl   # replay a recorded camera run
 python -m flagzero.sim.montecarlo --n 10000
 ```
 

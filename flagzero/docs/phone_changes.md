@@ -3,7 +3,7 @@
 What Person C added or changed on top of the v2 build prompts, and where it lives.
 Message shapes are in `protocol.md` and the dashboard data in `state_message.md`;
 this file is the "why" and the list of edits to Person A's code.
-All 62 tests pass (`python -m pytest -q`).
+All 87 tests pass: 86 by default (`python -m pytest -q`), plus B's full-clip test with `FZ_SLOW=1`.
 
 ## 1. Team decisions (rules)
 
@@ -56,6 +56,7 @@ Reads `state_message.md` fields directly. `/dashboard?mock=1` runs on built-in f
 | `server.py` | `GET /api/montecarlo/incident` |
 | `track.json` | real Interlagos from FastF1; the generic circuit is kept as `track_generic.json` for the generic-track tests |
 | `sim/sim.py`, `tools/scene_check.py` | use car 17's real position instead of the old T4 at 1423 m |
+| `core/incidents.py`, `core/severity.py` (vision) | B's predictive camera kinds accepted (`SPIN_RISK`, `CLOSING`, `OFF_TRACK`, `SLOWING`); `SPIN_RISK`/`CLOSING`/real `OFF_TRACK` → severity 2; camera sources keep `predicted` |
 | `tests/` | `test_a1_sim.py` uses `track_generic.json` for its generic-track checks, plus `test_interlagos_track`; `test_a2_a6.py` scenes use real positions; new `test_c_phone_extras.py` |
 
 ### Why `MC_GAP_S` changed from (0.8, 3) to (1, 10)
@@ -74,6 +75,18 @@ The dashboard's per-gap-band chart keeps the "too close for any system" band (un
 | `tools/mock_car.py` | Keyboard fake phone |
 | `tools/export_track.py` | Regenerates `track.json` from FastF1 (needs `pip install fastf1`) |
 
-## 6. Person B (vision)
+## 6. Person B (vision): integrated
 
-Nothing on the track is tied to a corner any more, so the stretch of track the paper represents is purely the vision calibration's choice. Report cars and hazards in the lap metres of `track.json` (4,247 m lap).
+B's `vision` branch was merged into `flagzero/`:
+- `flagzero/vision/`: the pipeline, calibration, markers and config
+- `flagzero/tools/`: `make_test_video`, `mock_vision`, `replay`, `vision_listen`
+- `tests/test_vision.py`: 19 tests
+- `flagzero/recordings/`: the synthetic clip's calibration and ground truth
+
+Changes made while integrating:
+- `T4_M` → `PAPER_MARK_M` (no special corner), and the preview/calibration labels changed to match.
+- `LAP_LEN_M` is read from `track.json` (4,247 m).
+- The test's import path now points at the repo root.
+- `start_demo --vision N` starts the camera together with the server and tunnel.
+
+The paper still represents 1380–1480 m (`TRACK_START_M`/`TRACK_END_M` in `vision_config.py`).
