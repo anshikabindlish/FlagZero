@@ -54,3 +54,8 @@ flagzero/logs/
 
 # written by tools/start_demo.py
 results/tunnel_url.txt
+
+# generated at run time
+results/latency.csv
+flagzero/recordings/synthetic*
+flagzero/vision/vision_calib.json

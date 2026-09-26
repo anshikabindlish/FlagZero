@@ -1,3 +1,0 @@
-incident,kind,to_car,detect_ms,warn_sent_ms,ack_ms,detect_to_sent_ms,detect_to_ack_ms,tunnel_rtt_ms
-1,IMPACT,21,1790455854772,1790455854790,1790455854792,18,20,
-1,IMPACT,21,1790456127588,1790456127635,1790456127636,47,48,3
