@@ -161,6 +161,7 @@ function onState(s) {
   $("approachBody").innerHTML = approachingTable(s, inc);
   renderDriver(s, inc);
   renderLatency(s);
+  watchIncidentForCounterfactual(s);
   $("traceTitle").textContent = `Live g-force · car #${focusCar(s)}`;
 }
 
@@ -595,6 +596,73 @@ function buildSliders() {
       mcTimer = setTimeout(runMonteCarlo, 250);
     });
   }
+}
+
+// ---- this incident: what if only marshals had flagged it? (GET /api/montecarlo/incident) ----
+// When a crash is detected the server freezes who was approaching (distance + speed) and replays
+// each of those cars thousands of times: once with the human-marshal delay, once with FlagZero's
+// delay (the measured detect->warn time once the approaching phone has acked its warning).
+let cfIncId = null, cfWarnMs = null, cf = null, cfTimer = null, cfTries = 0, cfLive = false;
+
+function watchIncidentForCounterfactual(s) {
+  if (MOCK) return;
+  const { inc } = topIncident(s);
+  cfLive = !!inc;
+  const lat = s.latency && s.latency.last_detect_to_warn_ms;
+  if (inc && inc.id !== cfIncId) {
+    cfIncId = inc.id; cfWarnMs = lat; cfTries = 0; scheduleCounterfactual(400);
+  } else if (inc && lat != null && lat !== cfWarnMs) {
+    cfWarnMs = lat; scheduleCounterfactual(150);           // the measured warning time just arrived
+  }
+  if (cf) $("cfLabel").textContent = cfLive ? "This incident" : "Last incident";
+}
+
+function scheduleCounterfactual(ms) {
+  clearTimeout(cfTimer);
+  cfTimer = setTimeout(fetchCounterfactual, ms);
+}
+
+async function fetchCounterfactual() {
+  try {
+    cf = await getJson(`/api/montecarlo/incident?id=${cfIncId}`);
+    renderCounterfactual();
+  } catch (e) {
+    if (++cfTries < 6) scheduleCounterfactual(800);        // snapshot not ready yet (needs one sim tick)
+  }
+}
+
+function renderCounterfactual() {
+  const box = $("cfBlock");
+  if (!cf || !cf.cars) return;
+  box.classList.remove("empty");
+  const label = cornerLabel(cf.corner);
+  const eb = cf.expected_impacts.marshal, ef = cf.expected_impacts.flagzero;
+  const cut = eb > 0 ? Math.round((1 - ef / eb) * 100) : 0;
+  const mWarn = cf.cars.length ? cf.cars.map((c) => c.marshal.warn_s).sort((a, b) => a - b)[Math.floor(cf.cars.length / 2)] : null;
+  const fzWarn = cf.flagzero_warn_s ?? (cf.cars[0] && cf.cars[0].flagzero.warn_s);
+  const pct = (x) => `${Math.round(x)}%`;
+  const cmp = (b, f, fmt, lowerIsBetter = true) => {
+    const cls = Math.abs(b - f) < 0.5 ? "same" : ((lowerIsBetter ? f < b : f > b) ? "good" : "bad");
+    return `<span class="${Math.abs(b - f) < 0.5 ? "same" : "bad"}">${fmt(b)}</span> → <span class="${cls}">${fmt(f)}</span>`;
+  };
+  box.innerHTML = `
+    <div class="cfTitle"><span id="cfLabel">${cfLive ? "This incident" : "Last incident"}</span>:
+      ${esc(String(cf.kind || "").replace(/_/g, " "))} at ${esc(cf.corner)}${label ? " · " + esc(label) : ""} · ${Math.round(cf.track_m)} m
+      <span class="muted">— what if only marshals had flagged it?</span></div>
+    <div class="cfHead">
+      <div><div class="big">${eb.toFixed(2)} → <span class="good">${ef.toFixed(2)}</span></div><div class="cap">expected secondary impacts${eb > 0 ? ` (−${cut}%)` : ""}</div></div>
+      <div><div class="big">${mWarn != null ? mWarn.toFixed(1) : "—"} s → <span class="good">${fzWarn != null ? fzWarn.toFixed(2) : "—"} s</span></div>
+        <div class="cap">time to warn the approaching cars · FlagZero ${cf.flagzero_measured ? "MEASURED on this incident" : "modelled (waiting for a phone to ack)"}</div></div>
+      <div><div class="big">${cf.cars_at_risk.marshal} → <span class="good">${cf.cars_at_risk.flagzero}</span></div><div class="cap">cars more likely than not to hit</div></div>
+    </div>
+    ${cf.cars.length ? `<table><thead><tr><th>Car</th><th>Distance</th><th>Speed</th><th>Arrives in</th>
+      <th>Warning before arrival · marshal → FlagZero</th><th>Secondary-impact risk</th><th>Speed at the hazard</th></tr></thead><tbody>${
+      cf.cars.map((c) => `<tr><td class="car">#${esc(c.car)}</td><td>${c.dist_m} m</td><td>${c.speed_kmh} km/h</td><td>${c.arrive_s.toFixed(1)} s</td>
+        <td>${cmp(c.marshal.lead_s, c.flagzero.lead_s, (x) => (x < 0 ? "too late" : x.toFixed(1) + " s"), false)}</td>
+        <td>${cmp(c.marshal.impact_pct, c.flagzero.impact_pct, pct)}</td>
+        <td>${cmp(c.marshal.speed_at_hazard_kmh, c.flagzero.speed_at_hazard_kmh, (x) => Math.round(x) + " km/h")}</td></tr>`).join("")
+    }</tbody></table>` : `<div class="note">No car was within 2,000 m of the hazard when it happened.</div>`}
+    <div class="note">Each car replayed ${cf.n_per_car.toLocaleString()} times from where it really was when the crash was detected, with the same marshal timings and braking physics as the Monte Carlo below. Sightline at ${esc(cf.corner)}: ${cf.sightline_m} m (a car already inside it sees the crash itself, so both columns match).</div>`;
 }
 
 buildSliders();

@@ -9,7 +9,8 @@
 > - **Driver OK = car rejoins:** after `ok_pressed` / `countdown_result OK`, the crashed car drives on under the current yellow/green flags (incident and flags stay until cleared). It stays stopped on TIMEOUT, on a red, or after `driver_request RED_FLAG`. The router only skips the crashed car while it's STOPPED.
 > - **Monte Carlo following gap:** `MC_GAP_S` went from (0.8, 3.0) to (1.0, 10.0). With 0.8–3 s only, the next car is already inside its stopping distance in ~94% of runs, so no warning system can help and both columns read ~93%. 1–10 s is a realistic spread for 20 cars on a ~80 s lap: secondary impacts 55% → 26%. The dashboard also shows results per gap band, so the 'too close for any system' band stays visible and honest.
 > - C5 is done: the dashboard proof panel (timeline, sliders → `/api/montecarlo`, results table with `/api/montecarlo/last` fallback, per-gap-band chart), `web/join.html` (QR codes from `location.origin`), and `start_demo.bat` / `start_demo.command` → `tools/start_demo.py` (server + tunnel, prints and opens the URLs).
-> - New tests: `tests/test_c_phone_extras.py`. All 59 tests pass.
+> - **Per-incident counterfactual:** when an incident is detected, `Engine` freezes who was approaching (car, distance, speed) on the next tick (`incident_snapshot()`), and records this incident's measured detect→warn time when the first warning is acked. `GET /api/montecarlo/incident?id=` replays each of those cars with `montecarlo.incident()` (same marshal model and braking physics as `run()`), marshal vs FlagZero, and the dashboard shows it at the top of the proof panel.
+> - New tests: `tests/test_c_phone_extras.py`. All 61 tests pass.
 >
 > The page paths are `/car.js` and `/dashboard.js` (server.py serves `/<name>.js` from `web/`), and the dashboard reads `state_message.md` fields directly. Section 1 and parts of section 5 below describe the earlier stand-in server and are kept for reference.
 

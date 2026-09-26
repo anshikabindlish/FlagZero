@@ -136,3 +136,31 @@ def test_car21_slows_for_double_yellow_and_drives_past(eng):
     assert in_zone_speeds and max(in_zone_speeds) <= 120 + 1
     assert passed and e.world.cars[21].speed_mps > 0         # kept driving
     assert e.world.cars[17].speed_mps == 0                   # no I'm OK yet: crashed car still where it stopped
+
+
+# ---------------------------------------------------------------- per-incident counterfactual
+def test_incident_counterfactual_physics():
+    from flagzero.sim import montecarlo
+    r = montecarlo.incident([(21, 500, 250), (3, 30, 150), (8, 1800, 200), (9, 400, 0)],
+                            sightline_m=150, fz_warn_s=0.35)
+    cars = {c["car"]: c for c in r["cars"]}
+    assert 9 not in cars                                          # stopped car isn't approaching
+    assert cars[21]["marshal"]["impact_pct"] > 30 and cars[21]["flagzero"]["impact_pct"] < 5   # FlagZero saves it
+    assert cars[3]["marshal"]["impact_pct"] == cars[3]["flagzero"]["impact_pct"] == 100       # too close for anyone
+    assert cars[8]["marshal"]["impact_pct"] == cars[8]["flagzero"]["impact_pct"] == 0          # far away either way
+    assert r["expected_impacts"]["flagzero"] < r["expected_impacts"]["marshal"]
+    assert r["flagzero_measured"] and cars[21]["flagzero"]["warn_s"] == 0.35
+
+
+def test_engine_snapshots_incident_and_measured_warning(eng):
+    e = eng
+    e.on_dash({"type": "scene", "n": 2}, PHONES)                 # car 21 ~9 s behind car 17
+    crash(e, t_ms=1000)
+    out = e.tick(0.05, PHONES, now_s=1.05, t_ms=1050)
+    snap = e.incident_snapshot()
+    assert snap and snap["cars"] and any(c[0] == 21 for c in snap["cars"])
+    assert snap["warn_ms"] is None and snap["detect_s"] == config.MC_IMU_DETECT_S
+    wid = next(m["id"] for c, m in out if c == 21 and m["type"] == "warning")
+    e.on_car(21, {"type": "ack", "id": wid}, t_ms=1120)
+    assert e.incident_snapshot()["warn_ms"] == 120               # this incident's measured detect -> warn
+    assert e.incident_snapshot(snap["id"]) is snap

@@ -169,6 +169,22 @@ def api_montecarlo_last() -> Response:
     return FileResponse(f) if f.exists() else JSONResponse({"error": "no saved run yet"}, status_code=404)
 
 
+@app.get("/api/montecarlo/incident")
+def api_montecarlo_incident(id: Optional[int] = None, n: int = 5000) -> JSONResponse:
+    """Marshal vs FlagZero for the cars that were really approaching one incident (latest if no id).
+    Uses the measured detect->warn time for FlagZero once a phone has acked its warning."""
+    snap = engine.incident_snapshot(id)
+    if snap is None:
+        return JSONResponse({"error": "no incident with approaching cars yet"}, status_code=404)
+    lat_ms = snap.get("warn_ms")                  # measured for THIS incident (None until a phone acks)
+    fz_s = None if lat_ms is None else snap["detect_s"] + lat_ms / 1000
+    res = montecarlo.incident(snap["cars"], snap["sightline_m"], fz_warn_s=fz_s,
+                              detect_s=snap["detect_s"], n=max(500, min(n, 50_000)))
+    res.update({"incident_id": snap["id"], "kind": snap["kind"], "corner": snap["corner"],
+                "track_m": snap["track_m"], "detect_s": snap["detect_s"], "measured_warn_ms": lat_ms})
+    return JSONResponse(res)
+
+
 @app.get("/api/latency")
 def api_latency() -> JSONResponse:
     from flagzero.core import latency

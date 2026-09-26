@@ -110,6 +110,62 @@ def run(n: int = config.MC_N, seed: Optional[int] = None, **overrides) -> dict:
     }
 
 
+def incident(cars: list, sightline_m: float, fz_warn_s: Optional[float] = None,
+             detect_s: float = config.MC_IMU_DETECT_S, n: int = 5000, seed: Optional[int] = 42,
+             visibility: float = config.MARSHAL_VISIBILITY) -> dict:
+    """Counterfactual for ONE real incident (Person C).
+
+    cars = [(car, dist_m, speed_kmh), ...] for every car approaching the hazard at the moment
+    it was detected. Each car is replayed n times with the same physics as run(): once with the
+    human-marshal delay (sim/marshal.py) and once with FlagZero's delay. FlagZero's delay is the
+    MEASURED detect->warn time for this incident when known (fz_warn_s), otherwise the model
+    (detect_s + network, falling back to the marshal if the sensor misses).
+    """
+    rng = np.random.default_rng(seed)
+    G = config.G
+    v_safe = config.ROUTER_V_SAFE_KMH / 3.6
+    measured = fz_warn_s is not None
+    rows, exp_b, exp_f = [], 0.0, 0.0
+    for car, dist, kmh in cars:
+        if kmh is None or kmh < 5 or dist is None:
+            continue                                   # stopped / unknown cars aren't approaching
+        v = kmh / 3.6
+        a = rng.uniform(*config.MC_BRAKE_G, n) * G
+        react = rng.uniform(*config.MC_DRIVER_REACT_S, n)
+        d_need = v * react + max(0.0, v * v - v_safe * v_safe) / (2 * a)
+        t_arrive = dist / v
+        t_sight = max(0.0, (dist - sightline_m) / v)
+        t_marshal = marshal.sample(n, rng, visibility=visibility)["total"]
+        if measured:
+            t_fz = np.full(n, float(fz_warn_s))
+        else:
+            hit = rng.random(n) >= config.MC_IMU_FALSE_NEG
+            t_fz = np.where(hit, detect_s + rng.uniform(*config.MC_NETWORK_S, n), t_marshal)
+
+        def outcome(t_warn):
+            t_eff = np.minimum(t_warn, t_sight)
+            d_left = dist - v * t_eff
+            brake_dist = np.maximum(0.0, d_left - v * react)
+            v_hit = np.sqrt(np.maximum(0.0, v * v - 2 * a * brake_dist))
+            return {"warn_s": float(np.median(t_warn)),
+                    "lead_s": float(np.median(t_arrive - t_warn)),
+                    "warned_in_time_pct": float(np.mean(t_warn < t_arrive) * 100),
+                    "impact_pct": float(np.mean(d_left < d_need) * 100),
+                    "speed_at_hazard_kmh": float(np.mean(v_hit) * 3.6)}
+
+        b, f = outcome(t_marshal), outcome(t_fz)
+        exp_b += b["impact_pct"] / 100
+        exp_f += f["impact_pct"] / 100
+        rows.append({"car": car, "dist_m": round(float(dist)), "speed_kmh": round(float(kmh)),
+                     "arrive_s": round(t_arrive, 2), "marshal": b, "flagzero": f})
+    return {"n_per_car": n, "sightline_m": sightline_m,
+            "flagzero_warn_s": fz_warn_s, "flagzero_measured": measured,
+            "cars": rows,
+            "expected_impacts": {"marshal": round(exp_b, 2), "flagzero": round(exp_f, 2)},
+            "cars_at_risk": {"marshal": sum(r["marshal"]["impact_pct"] >= 50 for r in rows),
+                             "flagzero": sum(r["flagzero"]["impact_pct"] >= 50 for r in rows)}}
+
+
 def save(result: dict) -> None:
     config.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     (config.RESULTS_DIR / "montecarlo.json").write_text(json.dumps(result, indent=2))

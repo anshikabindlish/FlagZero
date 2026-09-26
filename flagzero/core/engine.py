@@ -32,6 +32,28 @@ class Engine:
         self._sent_ms: dict[int, int] = {}
         self._warn_ids: dict[int, tuple[int, int]] = {}   # warning id -> (car, sent_ms)
         self._pings: dict[int, tuple[int, int]] = {}      # ping id -> (car, sent_ms)
+        self._snapshots: dict[int, dict] = {}              # incident id -> approaching cars at detection
+
+    def _snapshot_incidents(self, t_ms: int) -> None:
+        """Freeze who was approaching each incident the first tick after it was detected,
+        for the per-incident marshal-vs-FlagZero counterfactual (/api/montecarlo/incident)."""
+        for inc in self.world.incidents:
+            if inc.id in self._snapshots or not inc.approaching:
+                continue
+            srcs = {s["src"] for s in inc.sources}
+            self._snapshots[inc.id] = {
+                "id": inc.id, "kind": inc.kind, "corner": inc.corner, "track_m": inc.track_m, "t_ms": t_ms,
+                "sightline_m": self.sim.track.nearest_corner(inc.track_m).sightline_m,
+                # how long the first sensor took before it could report: phone capture window or camera
+                "detect_s": config.MC_IMU_DETECT_S if "IMU" in srcs else sum(config.MC_CAMERA_DETECT_S) / 2,
+                "cars": [(r["car"], r["dist_m"], r["speed_kmh"]) for r in inc.approaching],
+                "warn_ms": None,                                  # filled in when a phone acks its first warning
+            }
+
+    def incident_snapshot(self, inc_id: Optional[int] = None) -> Optional[dict]:
+        if inc_id is None:
+            return self._snapshots[max(self._snapshots)] if self._snapshots else None
+        return self._snapshots.get(inc_id)
 
     def next_id(self) -> int:
         self._msg_id += 1
@@ -97,6 +119,9 @@ class Engine:
             row = self.latency.ack(msg_id, t_ms, self.world.latency.get(f"rtt_car{car}_ms"))
             if row:
                 self.world.latency["last_detect_to_warn_ms"] = row["detect_to_ack_ms"]
+                snap = self.incident_snapshot()          # measured warning time for this incident's replay
+                if snap is not None and snap.get("warn_ms") is None:
+                    snap["warn_ms"] = row["detect_to_ack_ms"]
                 self.world.latency["last_detect_to_sent_ms"] = row["detect_to_sent_ms"]
 
     def pings(self, connected: set[int], t_ms: Optional[int] = None) -> Out:
@@ -175,6 +200,7 @@ class Engine:
         out = medical.update(self.world, t_ms)
         severity.update(self.world)
         warnings = router.compute(self.world, self.sim.lap)
+        self._snapshot_incidents(t_ms)
         for n, cw in warnings.items():
             self.world.cars[n].warning = cw.level
         for car in connected:

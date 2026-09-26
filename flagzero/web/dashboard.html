@@ -112,6 +112,17 @@
   #mcTable td.win { color: #6fcf8f; font-weight: 800; }
   #mcTable th:nth-child(n+2), #mcTable td:nth-child(n+2) { text-align: right; }
   .sub { color: var(--muted); font-size: .8rem; margin: 0 0 .4rem; }
+  /* this-incident counterfactual */
+  #cfBlock { border: 1px solid #1f6f3f; background: #10201a; border-radius: .7rem; padding: .9rem 1.1rem; margin-bottom: 1.1rem; }
+  #cfBlock.empty { display: none; }
+  #cfBlock .cfTitle { font-weight: 900; font-size: 1.05rem; margin-bottom: .6rem; }
+  #cfBlock .cfTitle .muted { color: var(--muted); font-weight: 600; }
+  #cfBlock .cfHead { display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: .7rem; }
+  #cfBlock .cfHead .big { font-size: 2rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+  #cfBlock .cfHead .cap { color: var(--muted); font-size: .8rem; }
+  #cfBlock td { font-size: .98rem; padding: .35rem .5rem; }
+  #cfBlock th:nth-child(n+2), #cfBlock td:nth-child(n+2) { text-align: right; }
+  .bad { color: #ff7a7e; font-weight: 800; } .good { color: #6fcf8f; font-weight: 800; } .same { color: var(--muted); }
 
   footer { display: flex; gap: .6rem; align-items: center; padding: 0 1.2rem 1.2rem; color: var(--muted); font-size: .85rem; flex-wrap: wrap; }
 </style>
@@ -149,6 +160,7 @@
     </div>
     <section class="panel" id="proof">
       <h2><span class="grow">Proof · human marshal vs FlagZero · Monte Carlo</span><span class="note" id="mcInfo"></span></h2>
+      <div id="cfBlock" class="empty"></div>
       <div class="proofGrid">
         <div>
           <p class="sub">Median incident: time until the approaching driver is warned</p>
