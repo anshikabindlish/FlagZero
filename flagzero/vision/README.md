@@ -16,7 +16,6 @@ flagzero/
     calib.py  detector.py  tracker.py  hazards.py  scene.py  pipeline.py  sender.py
   tools/
     make_test_video.py synthetic paper-track clip + calibration (test with no camera)
-    vision_listen.py   stand-in server that prints what arrives on /ws/vision
     mock_vision.py     keyboard-driven fake camera (s/d/m/p/o/l/h/c)
     replay.py          replay a recording (JSONL or video) - the demo fallback
   tests/test_vision.py
@@ -32,12 +31,12 @@ pip install -r requirements.txt             # repo root: opencv-python>=4.7 (has
 
 ```bash
 python flagzero/tools/make_test_video.py          # ~45 s, writes recordings/synthetic.mp4 + calib
-python flagzero/tools/vision_listen.py            # terminal 1: fake server on :8000
+start_demo.bat --no-tunnel                        # terminal 1: the real server (Mac: ./start_demo.command --no-tunnel)
 python flagzero/vision/vision.py --source flagzero/recordings/synthetic.mp4 \
        --calib flagzero/recordings/synthetic_calib.json               # terminal 2
 ```
 
-Expected, on the listener:
+Expected, in the preview window and on the dashboard (http://localhost:8000/dashboard):
 
 | t (s) | event | what happened in the clip |
 |---|---|---|
@@ -50,7 +49,7 @@ Expected, on the listener:
 
 The spin is flagged **2.5 s before** the stopped-car detection. That's the head start to show.
 
-`pytest flagzero/tests/test_vision.py -q` runs 18 tests in ~2 s (`FZ_SLOW=1` adds the full clip).
+`python -m pytest tests/test_vision.py -q` runs 18 tests in ~2 s (`FZ_SLOW=1` adds the full clip).
 
 ## 2. Venue setup
 

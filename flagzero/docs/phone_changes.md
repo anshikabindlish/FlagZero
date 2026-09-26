@@ -79,7 +79,7 @@ The dashboard's per-gap-band chart keeps the "too close for any system" band (un
 
 B's `vision` branch was merged into `flagzero/`:
 - `flagzero/vision/`: the pipeline, calibration, markers and config
-- `flagzero/tools/`: `make_test_video`, `mock_vision`, `replay`, `vision_listen`
+- `flagzero/tools/`: `make_test_video`, `mock_vision`, `replay` (B's `vision_listen` stand-in server was dropped: the real server replaces it)
 - `tests/test_vision.py`: 19 tests
 - `flagzero/recordings/`: the synthetic clip's calibration and ground truth
 
