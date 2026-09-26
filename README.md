@@ -24,7 +24,15 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Run — race control host (MacBook Air #1)
+## Run — one click (recommended)
+
+Windows: double-click **`start_demo.bat`**. Mac: double-click **`start_demo.command`**
+(or `python3 -m flagzero.tools.start_demo`). It starts the server and an https
+tunnel, waits until the tunnel is live, prints the phone links, and opens the
+dashboard and the QR join page. Scan the QR codes once it says **READY**.
+Ctrl+C in that window stops everything.
+
+## Run — race control host by hand (MacBook Air #1)
 
 ```bash
 # Terminal 1: the server
@@ -61,7 +69,9 @@ http://<host>:8000/join            # anyone joining mid-demo
 ## Simulate without hardware
 
 ```bash
-python -m flagzero.tools.mock_car --car 17
+python -m flagzero.tools.mock_car --car 17          # keyboard fake phone (i = impact, o = ok, x = timeout, ...)
+python -m flagzero.tools.scene_check 2              # plays a whole scene against the running server
+python -m pytest -q                                 # all tests
 python -m flagzero.tools.mock_vision
 python -m flagzero.tools.replay <recorded_run.json>
 python -m flagzero.sim.montecarlo --n 10000
@@ -77,4 +87,9 @@ python -m flagzero.sim.montecarlo --n 10000
 - Warning levels (phones): `0 NORMAL, 1 CAUTION, 2 YELLOW, 3 DBL YELLOW,
   4 SLOW ZONE, 5 RED`.
 - Severity levels (race control): `0-4`, where `4` = RED FLAG RECOMMENDED.
-  RED only shows on phones after race control clicks **Confirm Red**.
+  RED shows on phones after race control clicks **Confirm Red**, or
+  automatically if a crashed driver doesn't press I'm OK within 15 s.
+- **Only race control returns a flag to green** (dashboard Reset / Scene).
+- Track: the real Interlagos (`flagzero/track.json`, exported from FastF1 by
+  `tools/export_track.py`); no corner is special. Phone/dashboard additions
+  to the v2 plan are listed in `flagzero/docs/phone_changes.md`.

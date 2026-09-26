@@ -1,7 +1,7 @@
 """A5: Monte Carlo - human marshal vs FlagZero, vectorised with numpy.
 
 Each run = one random incident with one car following it.
-    following gap 0.8-3 s, speed 150-250 km/h, sightline 50-250 m,
+    following gap 1-10 s, speed 150-250 km/h, sightline 50-250 m,
     braking 1.0-1.5 g, driver reaction 0.7-1.5 s
 Time until the driver is warned:
     marshal:  see + react + flag            (sim/marshal.py)

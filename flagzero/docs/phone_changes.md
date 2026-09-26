@@ -1,161 +1,79 @@
-# Phone car node: changes to the v2 plan (for Person A / server.py)
+# Changes to the v2 plan: phones, dashboard, track (Person C)
 
-> **Status (integrate branch):** wired into A's `server.py`. Person C's changes to A's files, all small:
-> - `core/engine.py` + `core/incidents.py`: handle `driver_request` (FALSE_ALARM → reset if below red; RED_FLAG → `DRIVER` source) and `green_flag` (= dashboard reset).
-> - `core/severity.py`: a `DRIVER`/`RED_FLAG` source → severity 4 (RED FLAG RECOMMENDED, waits for Confirm red).
-> - `core/router.py` + `config.py`: `ROUTER_FLAG_ZONE_M = 500` (inside it a car always sees the incident's flag), `SPEED_CAP_KMH[3] = 120` (cars slow for DBL YELLOW and drive past), and scene positions retuned for Interlagos.
-> - `track.json` is now the real Interlagos (the generic circuit is kept as `track_generic.json`, and `tests/test_a1_sim.py` uses it for its generic-track checks).
-> - **No special corner:** T4 is an ordinary corner now. There's no paper-track window in `track.json`, nothing highlighted on the dashboard, and scenes line car 21 up ~9 s behind car 17 wherever it is (`SCENE_CAR21_BEHIND_S`). Person B: the camera's stretch of track is now purely your vision calibration's choice.
-> - **Driver OK = car rejoins:** after `ok_pressed` / `countdown_result OK`, the crashed car drives on under the current yellow/green flags (incident and flags stay until cleared). It stays stopped on TIMEOUT, on a red, or after `driver_request RED_FLAG`. The router only skips the crashed car while it's STOPPED.
-> - **Monte Carlo following gap:** `MC_GAP_S` went from (0.8, 3.0) to (1.0, 10.0). With 0.8–3 s only, the next car is already inside its stopping distance in ~94% of runs, so no warning system can help and both columns read ~93%. 1–10 s is a realistic spread for 20 cars on a ~80 s lap: secondary impacts 55% → 26%. The dashboard also shows results per gap band, so the 'too close for any system' band stays visible and honest.
-> - C5 is done: the dashboard proof panel (timeline, sliders → `/api/montecarlo`, results table with `/api/montecarlo/last` fallback, per-gap-band chart), `web/join.html` (QR codes from `location.origin`), and `start_demo.bat` / `start_demo.command` → `tools/start_demo.py` (server + tunnel, prints and opens the URLs).
-> - **Per-incident counterfactual:** when an incident is detected, `Engine` freezes who was approaching (car, distance, speed) on the next tick (`incident_snapshot()`), and records this incident's measured detect→warn time when the first warning is acked. `GET /api/montecarlo/incident?id=` replays each of those cars with `montecarlo.incident()` (same marshal model and braking physics as `run()`), marshal vs FlagZero, and the dashboard shows it at the top of the proof panel.
-> - **Only race control returns a flag to green.** Drivers can escalate (I'm OK, recommend red) and inform, but never clear:
->   - The phones no longer have a green-flag button, and the server ignores `green_flag` from phones (logged).
->   - `driver_request FALSE_ALARM` is now only a REPORT: it adds a `DRIVER`/`FALSE_ALARM` source (no confidence, no severity change), and the dashboard shows "Driver says: reports a false alarm · press RESET to clear if you agree".
->   - Only the dashboard's `reset` (or `scene`) clears incidents.
-> - New tests: `tests/test_c_phone_extras.py`. All 62 tests pass.
->
-> The page paths are `/car.js` and `/dashboard.js` (server.py serves `/<name>.js` from `web/`), and the dashboard reads `state_message.md` fields directly. Section 1 and parts of section 5 below describe the earlier stand-in server and are kept for reference.
+What Person C added or changed on top of the v2 build prompts, and where it lives.
+Message shapes are in `protocol.md` and the dashboard data in `state_message.md`;
+this file is the "why" and the list of edits to Person A's code.
+All 62 tests pass (`python -m pytest -q`).
 
-From Person C. The phone page follows the v2 build-prompts protocol exactly, **plus the additions below**. Everything here is already implemented on the phone side in `flagzero/web/car.html` + `car.js`. `flagzero/tools/mock_server.py` is a working reference for the server side of every item.
+## 1. Team decisions (rules)
 
-## 1. Serving the page
-
-| Route | Serves |
+| Rule | Where it's enforced |
 |---|---|
-| `GET /car?car=N` | `flagzero/web/car.html` |
-| `GET /web/car.js` | `flagzero/web/car.js` |
+| **Only race control returns a flag to green** (dashboard Reset / Scene). Drivers can escalate and inform, never clear. | `engine.on_car`: phone `green_flag` is ignored; `driver_request FALSE_ALARM` is only a report |
+| **No response in 15 s = automatic RED** (medical emergency); a *recommended* red still waits for Confirm red | `config.AUTO_RED_ON_TIMEOUT`, `COUNTDOWN_S = 15`, `severity.py` |
+| **Driver OK = the crashed car rejoins** and drives on under the current yellow/green flags; it stays stopped on red, on no response, or after asking for red | `engine._resume_if_ok`, `router.compute` (only a *stopped* crashed car is skipped) |
+| **Cars behave like a race**: the crashed car stops where it is (no teleport); cars slow to 120 km/h under DBL YELLOW and drive past; RED caps everyone | `config.SPEED_CAP_KMH = {3: 120, 4: 80, 5: 60}`, `ROUTER_FLAG_ZONE_M = 500` |
+| **Real Interlagos, no special corner** | `track.json` (FastF1 export), scenes line car 21 up ~9 s behind car 17 wherever it is |
 
-`car.html` loads its script from `/web/car.js`. In FastAPI:
+## 2. Phone car node (`web/car.html`, `web/car.js`)
 
-```python
-app.mount("/web", StaticFiles(directory=WEB_DIR), name="web")
+- v2 protocol on `/ws/car?car=N`: `hello`, `tel` (10 Hz), `imu_event` (`cls` KERB/SPIN/IMPACT/SEVERE/ROLLOVER), `imu_update`, `ok_pressed`, `countdown_result`, and it acks every `warning` and `ping`.
+- On-device detection state machine: IDLE → CAPTURE (300 ms) → classify and send → POST (1.5 s stillness → `imu_update`). Thresholds are in `CFG` at the top of `car.js`.
+- Full-screen flag display by `level` (0–5), with the distance counting down, a beep pattern per level, and vibration on Android.
+- 15 s I'M OK countdown, which starts locally if the server's `countdown` hasn't arrived within 500 ms (fail-safe).
+- Driver buttons: **I'M OK**, **RECOMMEND RED FLAG** (`driver_request RED_FLAG`), **REPORT FALSE ALARM** (`driver_request FALSE_ALARM`, report only), and **CONTINUE UNDER YELLOW** (closes the panel). There is no green-flag button.
+- NO LINK after 3 s without a message; important messages are queued offline and flushed on reconnect.
 
-@app.get("/car")
-def car_page():
-    return FileResponse(WEB_DIR / "car.html")
-```
+## 3. Race-control dashboard (`web/dashboard.html`, `web/dashboard.js`)
 
-## 2. Unchanged from the v2 protocol
+Reads `state_message.md` fields directly. `/dashboard?mock=1` runs on built-in fake data.
+1. Active incident: kind, corner and name, source chips with confidence, fused %, medical, and **"Driver says"** (recommends red / reports a false alarm).
+2. Approaching cars sorted by ETA, with each car's actual flag.
+3. Driver status: SIM vitals, I'm-OK response and countdown, medical.
+4. RED FLAG RECOMMENDED banner with **Confirm red**, a RED FLAG OUT bar (automatic or confirmed), and Reset / Scene buttons.
+5. Track map from `/api/track`: real Interlagos, cars coloured by their flag, hazard marker.
+6. Live g-force trace of the incident car (from `latency.tel`).
+7. Latency: detect → warning per trial with median/p90/max, and per-phone RTT.
+8. **Proof panel:**
+   - "This incident" counterfactual (`/api/montecarlo/incident`)
+   - marshal-vs-FlagZero timeline
+   - sliders that re-run `/api/montecarlo`
+   - results table with a `/api/montecarlo/last` fallback
+   - secondary impacts by following-gap band
 
-The phone uses these exactly as in the v2 build prompts. Every phone message also carries `"car": N`.
+`web/join.html`: QR codes for car 17, car 21 and the dashboard (`?base=https://<tunnel>`).
 
-**Phone → server, on `/ws/car?car=N`:**
-- `hello {platform}`
-- `tel {g, gyro}` at 10 Hz
-- `imu_event {cls: KERB|SPIN|IMPACT|SEVERE|ROLLOVER, peak_g, dur_ms, gyro_peak, rot_deg, conf, capture_ms}`
-  - It can also carry `test: true` when sent from the on-screen "test crash" button.
-- `imu_update {still: true}`, sent about 1.5 s after an event if the phone stays still
-- `ok_pressed`
-- `countdown_result {result: OK|TIMEOUT}`
-- `ack {id}`: the phone acks **every `warning` and every `ping`**
+## 4. Edits to Person A's code
 
-**Server → phone:**
-- `warning {id, level 0–5, label, corner, dist_m, eta_s}`
-  - The phone displays by `level`.
-  - `dist_m` / `eta_s` may be `null` (e.g. for the crashed car itself).
-- `countdown {secs, peak_g}`
-- `medical {status: MONITOR|URGENT}`
-- `reset`
-- `ping {id}`
+| File | Change |
+|---|---|
+| `core/engine.py` | `driver_request` (RED_FLAG → stop the car + DRIVER source; FALSE_ALARM → report); phone `green_flag` ignored; `_resume_if_ok` (car rejoins after OK); `position_scene` = car 21 ~9 s behind car 17 (no fixed corner); `_snapshot_incidents` / `incident_snapshot` (approaching cars at detection + this incident's measured detect→warn) |
+| `core/incidents.py` | `handle_driver_request` |
+| `core/severity.py` | a `DRIVER`/`RED_FLAG` source → severity 4 (waits for Confirm red) |
+| `core/router.py` | 500 m flag zone (a car always sees the incident's flag inside it; stops YELLOW/DBL-YELLOW flip-flopping under the speed cap); only a *stopped* crashed car is skipped |
+| `config.py` | `ROUTER_FLAG_ZONE_M`, `SPEED_CAP_KMH[3] = 120`, `SCENE_CAR21_BEHIND_S`, `MC_GAP_S = (1, 10)` |
+| `sim/montecarlo.py` | `incident()` counterfactual for one real incident (same physics as `run()`) |
+| `server.py` | `GET /api/montecarlo/incident` |
+| `track.json` | real Interlagos from FastF1; the generic circuit is kept as `track_generic.json` for the generic-track tests |
+| `sim/sim.py`, `tools/scene_check.py` | use car 17's real position instead of the old T4 at 1423 m |
+| `tests/` | `test_a1_sim.py` uses `track_generic.json` for its generic-track checks, plus `test_interlagos_track`; `test_a2_a6.py` scenes use real positions; new `test_c_phone_extras.py` |
 
-## 3. Changes and additions
+### Why `MC_GAP_S` changed from (0.8, 3) to (1, 10)
+With the next car only 0.8–3 s behind, it is already inside its own stopping distance in ~94% of runs, so no warning system can help and both columns read ~93%. 1–10 s is a realistic spread for 20 cars on a ~80 s lap:
+- secondary impacts **55% → 26%**
+- median time to warn **4.6 s → 0.49 s**
+- speed at the hazard **92 → 43 km/h**
 
-### 3.1 Countdown is 15 s, not 10
-Put `COUNTDOWN_S = 15` in `config.py` and send `{"type":"countdown","secs":15,...}`. The phone uses the server's `secs`, falling back to 15 locally.
+The dashboard's per-gap-band chart keeps the "too close for any system" band (under ~2 s) visible, so the claim stays honest.
 
-### 3.2 New phone → server message: `driver_request`
-```json
-{"type":"driver_request","car":17,"request":"FALSE_ALARM"}
-{"type":"driver_request","car":17,"request":"RED_FLAG"}
-```
-- **`FALSE_ALARM`**: the driver pressed I'M OK and reports that it was only a wobble or loss of grip, not a crash.
-  - The phone only offers it after OK, and only while that car's level is below 5.
-  - **Server:** if the incident is below red, clear it exactly like a dashboard `reset`: clear incidents, stop countdowns, send `reset` to every phone. **Ignore it if the incident is already red.**
-- **`RED_FLAG`**: the driver recommends a red flag, e.g. because they're OK but stopped at a dangerous spot.
-  - If sent during the countdown, the phone also sends `ok_pressed` + `countdown_result OK` first, because the driver is responsive.
-  - **Server:** raise the incident to **severity 4 / `red_pending = true`**, the same as a TIMEOUT, so the dashboard shows RED FLAG RECOMMENDED. Level 5 RED still only goes to phones after **Confirm red**. Show "driver requested" as a source chip on the dashboard.
+## 5. Tools
 
-### 3.2b No driver response = automatic red (change from the plan)
-When a car sends `countdown_result TIMEOUT` (15 s with no I'M OK), the driver is unresponsive, which is a medical emergency. **Send level 5 RED to every car immediately. Don't wait for Confirm red.** Also set medical URGENT, add `NO_RESPONSE` as a source, and include `"red_active": true` in the dashboard `state` message so the dashboard shows "RED FLAG · AUTO (NO RESPONSE)". Race control can still clear it with Reset.
-`driver_request RED_FLAG` from a responsive driver still only *recommends* red (`red_pending`) and needs Confirm red.
+| Tool | What it does |
+|---|---|
+| `start_demo.bat` / `start_demo.command` → `tools/start_demo.py` | Starts the server and a cloudflared tunnel, waits (via DNS-over-HTTPS) until the tunnel resolves publicly, then opens the dashboard and join page via localhost. Opening a new tunnel name too early makes the PC and Wi-Fi resolvers cache NXDOMAIN. |
+| `tools/mock_car.py` | Keyboard fake phone |
+| `tools/export_track.py` | Regenerates `track.json` from FastF1 (needs `pip install fastf1`) |
 
-### 3.3 New phone → server message: `green_flag`
-```json
-{"type":"green_flag","car":21}
-```
-- A "RACE CONTROL · GREEN FLAG" button on the phones, shown whenever a flag is out, so testing and rehearsals don't wait on anything.
-- **Server:** treat it exactly like the dashboard's `{"type":"reset"}`.
-- Once the dashboard has a Reset button, we can hide the phone button for the real demo. In real racing, only race control ends a red flag.
+## 6. Person B (vision)
 
-### 3.4 No automatic reset
-Flags stay out until the dashboard `reset`, a phone `green_flag`, or a driver `FALSE_ALARM` clears them.
-
-### 3.5 Fail-safe behaviour on the phone (no server change needed, just be aware)
-- **Local countdown:** after IMPACT, SEVERE or ROLLOVER, the phone starts the countdown itself if no `countdown` arrives within 500 ms. The server may still send one; the phone ignores a second one.
-- **Offline queue:** while the socket is down, `imu_event`, `imu_update`, `ok_pressed`, `countdown_result`, `driver_request` and `green_flag` are queued and sent on reconnect, so the server may receive them late.
-- **Link status:** the phone shows NO LINK if no message (including `ping`) arrives for 3 s. **Please ping each phone at least once a second.**
-
-## 4. Summary checklist for server.py
-
-- [ ] Serve `/car` and mount `/web`
-- [ ] `COUNTDOWN_S = 15`
-- [ ] `driver_request FALSE_ALARM` → reset everything (ignore if already red)
-- [ ] `countdown_result TIMEOUT` → automatic level 5 RED to all cars, `red_active: true` (no Confirm red)
-- [ ] `driver_request RED_FLAG` → severity 4, `red_pending = true`, "driver requested" source
-- [ ] `green_flag` → same as dashboard `reset`
-- [ ] Ping each phone at least once per second, and match `ack.id` for latency
-- [ ] Accept `test: true` on `imu_event`. It can be treated like a real event, or flagged on the dashboard.
-
-## 5. What the dashboard needs from server.py
-
-`flagzero/web/dashboard.html` + `dashboard.js` (served at `GET /dashboard`, connects to `/ws/dash`). It reads the v2 `state` message and is tolerant of missing fields: a panel shows "—" if its field isn't there yet. The extra fields below make every panel work. `mock_server.py` sends all of them.
-
-### 5.1 Extra fields on the 10 Hz `state` message
-```json
-{"type":"state",
- "cars":[{"car":21,"track_m":1213,"speed_kmh":190,"warning":2}],
- "incidents":[{"id":"inc-3","kind":"IMPACT","car":17,"corner":"T4","track_m":1423,
-               "severity":3,"fused_conf":0.88,"sources":["IMU","CAMERA","NO_RESPONSE","DRIVER"],
-               "medical":"MONITOR|URGENT|null","created_ms":0,"updated_ms":0,
-               "approaching":[{"car":21,"dist_m":210,"speed_kmh":180,"eta_s":4.2,"warning":3}]}],
- "red_pending":false,
- "red_active":false,
- "drivers":{"17":{"hr":142,"spo2":97,"vitals":"SIM","response":"WAITING|OK|NO_RESPONSE|null",
-                  "countdown_s":9,"medical":"MONITOR|URGENT|null"}},
- "latency":{"per_car":{"17":110,"21":95},"tunnel_rtt_ms":110,"last_detect_to_warn_ms":430}}
-```
-- `incidents[].approaching`: optional. Without it, the dashboard works out distance and ETA itself from `cars`.
-- `sources` values that get coloured tags: `IMU`, `CAMERA`, `NO_RESPONSE`, `DRIVER`, `TEST`.
-- `red_active`: a red flag is out, either automatic (no response) or confirmed. `red_pending`: waiting for Confirm red.
-- `drivers`: keyed by car number as a string. SIM vitals: 70–80 bpm at rest, ramping to 135–145 over 5 s after an impact, SpO₂ 96–98.
-- `latency.last_detect_to_warn_ms`: the dashboard records each new value as a trial and shows the median, p90 and max.
-
-### 5.2 Forward phone telemetry to dashboards
-For the live g-force trace, forward each phone's `tel` and `imu_event` to every `/ws/dash` client as-is, adding `car` and optionally `t_ms`:
-```json
-{"type":"tel","car":17,"g":0.21,"gyro":14}
-{"type":"imu_event","car":17,"cls":"IMPACT","peak_g":5.2,"conf":0.84}
-```
-
-### 5.3 `GET /track.json`: the track is now the real Interlagos
-`flagzero/track.json` is committed. It's the **real Interlagos layout** (Autódromo José Carlos Pace), exported from FastF1 with `flagzero/tools/export_track.py`, using the 2023 São Paulo GP qualifying pole-lap trace.
-- **Lap:** 4,247 m (telemetry distance; the official figure is 4,309 m).
-- **Corners:** 15 real corners with names, e.g. T4 Descida do Lago at 1,389 m.
-- **Speeds:** a real speed profile (`speed_profile_kmh`, [lap_m, km/h] every 10 m) that the sim can use directly.
-- **Demo corner:** still **T4**, now at **1,389 m** instead of 1,423 m.
-
-**Person B:** the paper track now maps to `paper_window` = **[1339, 1439] m** instead of 1380–1480.
-**Person A:** use `lap_length_m`, `corners`, `speed_profile_kmh` and `demo_corner` from this file instead of the generic 4,000 m circuit. `tools/mock_server.py` has a small reference race sim: race pace = 0.9 × the profile, and flags cap speed near the hazard (YELLOW 180, DBL YELLOW 120, SLOW ZONE 80 km/h from 500 m before to 100 m after; RED 80 km/h everywhere, queue at the pit entry). The crashed car stops where it is, and nobody teleports.
-
-Field names:
-Serve `flagzero/track.json` at `/track.json`. The dashboard accepts
-`{"lap_length_m", "points":[{x,y,d}] or [[x,y,d]], "corners":[{"name","pos_m","sightline_m","blind"}], "paper_window":[1380,1480]}`
-(`d` = lap distance; it's computed from the polyline if missing, and several alternative field names work too). Without the file it draws a built-in 4,000 m layout with T4 at 1423 m.
-
-### 5.4 Checklist
-- [ ] `GET /dashboard` serves `web/dashboard.html`
-- [ ] `state` includes `drivers`, `red_active`, `latency.per_car` (and optionally `incidents[].approaching`)
-- [ ] Forward `tel` + `imu_event` from phones to dashboards
-- [ ] `GET /track.json`
+Nothing on the track is tied to a corner any more, so the stretch of track the paper represents is purely the vision calibration's choice. Report cars and hazards in the lap metres of `track.json` (4,247 m lap).

@@ -16,8 +16,14 @@ everything; every latency figure is computed using server time, not the
 sender's clock (phone clocks aren't trustworthy/synced).
 
 Warning levels: `0 NORMAL, 1 CAUTION, 2 YELLOW, 3 DBL_YELLOW, 4 SLOW_ZONE, 5 RED`
-Severity levels: `0-4` (4 = RED FLAG RECOMMENDED; level 5 / RED only ever
-reaches a phone after race control clicks "Confirm red" on the dashboard).
+Severity levels: `0-4` (4 = RED FLAG RECOMMENDED). Level 5 / RED reaches the
+phones either when race control clicks "Confirm red" on the dashboard, or
+automatically when a crashed driver doesn't press I'm OK within 15 s
+(`AUTO_RED_ON_TIMEOUT`).
+
+**Only race control returns a flag to green** (dashboard `reset` / `scene`).
+Drivers can escalate (I'm OK, recommend red) and inform (report a false
+alarm), but no phone message clears a flag.
 
 ---
 
@@ -54,7 +60,26 @@ Driver pressed the big "I'm OK" button during a countdown.
 ```json
 {"type": "countdown_result", "car": 17, "result": "OK|TIMEOUT"}
 ```
-Sent once the 10-second countdown resolves, either way.
+Sent once the 15-second countdown resolves, either way. After `OK` (and no red
+out or recommended for this incident) the crashed car rejoins and drives on
+under the current flags; after `TIMEOUT` it stays stopped and RED goes out
+automatically.
+
+```json
+{"type": "driver_request", "car": 17, "request": "RED_FLAG|FALSE_ALARM"}
+```
+Buttons on the crashed car's phone after an impact. `RED_FLAG`: the driver
+recommends a red (e.g. stopped somewhere dangerous) -> a `DRIVER`/`RED_FLAG`
+source, severity 4, `red_pending` until race control confirms; the car stays
+stopped. `FALSE_ALARM`: the driver *reports* it was only a wobble -> a
+`DRIVER`/`FALSE_ALARM` source shown on the dashboard; flags stay out until race
+control resets. Neither adds to `fused_conf`.
+
+```json
+{"type": "green_flag", "car": 21}
+```
+Ignored (logged). Kept only so an old phone page can't clear flags: only race
+control can return to green.
 
 ```json
 {"type": "ack", "id": 123}
@@ -72,7 +97,7 @@ Sent when this car's warning level changes, and every 250ms while a warning
 is active (so `dist_m`/`eta_s` count down live on screen).
 
 ```json
-{"type": "countdown", "secs": 10, "peak_g": 5.2}
+{"type": "countdown", "secs": 15, "peak_g": 5.2}
 ```
 Tells this phone to show the "PRESS OK" countdown, triggered by an
 IMPACT-or-worse `imu_event` from this same car.
@@ -151,7 +176,7 @@ all operate on internally.
 |---|---|---|
 | `id` | int | Unique, assigned on creation. |
 | `kind` | string | The hazard/event kind that created it (`IMPACT`, `STOPPED_VEHICLE`, `DEBRIS`, etc). |
-| `sources` | list[string] | Which inputs corroborate this incident, e.g. `["imu", "camera"]`. |
+| `sources` | list[object] | Corroborating inputs, each `{"src", "kind", "conf", "ms"}`: `src` is `IMU`, `CAMERA`, `NO_RESPONSE` or `DRIVER` (`conf` is null for the last two). |
 | `car` | int or null | The car involved, if any (null for track-level hazards like debris). |
 | `track_m` | float | Position along the lap, metres. |
 | `corner` | string | Nearest named corner code, e.g. `"T4"`. |
@@ -169,5 +194,11 @@ all operate on internally.
 |---|---|
 | `GET /car?car=N` | `web/car.html` (phone page; JS reads `car` from the query string) |
 | `GET /dashboard` | `web/dashboard.html` |
-| `GET /join` | `web/join.html` (QR codes to the two car pages) |
+| `GET /join` | `web/join.html` (QR codes; `?base=https://<tunnel>` points them at the tunnel) |
+| `GET /<name>.js` | page scripts from `web/` (`car.js`, `dashboard.js`) |
+| `GET /api/track` | `track.json` (real Interlagos) |
+| `GET /api/state` | the current `state` message as JSON |
 | `GET /api/montecarlo?n=10000&...` | Monte Carlo results, computed live (see A5) |
+| `GET /api/montecarlo/last` | the last saved run (the dashboard's fallback) |
+| `GET /api/montecarlo/incident?id=` | marshal vs FlagZero replay of the cars that were really approaching one incident (latest if no id) |
+| `GET /api/latency` | latency stats |
