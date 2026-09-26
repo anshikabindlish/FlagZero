@@ -1,0 +1,21 @@
+{
+  "_comment": "PENDING CONFIRMATION: total_length_m defaults to 5000m for convenience (round number). T4 at 1423m sits ~28.5% around the lap. Confirm or edit before H1 -- nothing else in the repo hardcodes this.",
+  "track_id": "flagzero_demo_track",
+  "total_length_m": 5000,
+  "direction": "clockwise",
+  "zones": {
+    "START_FINISH": {
+      "label": "Start/Finish",
+      "track_position_m": 0,
+      "type": "start_finish"
+    },
+    "T4": {
+      "label": "Turn 4",
+      "track_position_m": 1423,
+      "type": "corner"
+    }
+  },
+  "_todo_zones": [
+    "Add more named zones (T1, T2, T3, T5, ...) here in the same shape as T4 as you define them on the paper track. Everything else in the repo looks these up by name -- nobody should hardcode a track_position_m."
+  ]
+}
