@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FlagZero join</title>
+<style>
+  :root { --bg: #0d0f12; --panel: #161a20; --line: #2a313b; --text: #e8ecf1; --muted: #8a95a3; --red: #e0262b; --blue: #4aa3ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; padding: 24px 16px; }
+  h1 { text-align: center; letter-spacing: .08em; margin: 0 0 .3rem; }
+  .sub { text-align: center; color: var(--muted); margin: 0 0 1.6rem; }
+  .cards { display: flex; flex-wrap: wrap; gap: 1.2rem; justify-content: center; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 1rem; padding: 1.2rem; text-align: center; width: min(340px, 100%); }
+  .card h2 { margin: 0 0 .2rem; font-size: 1.5rem; }
+  .card .role { color: var(--muted); margin-bottom: .9rem; }
+  .qr { background: #fff; padding: 12px; border-radius: .6rem; display: inline-block; }
+  .qr img, .qr canvas { display: block; width: 240px; height: 240px; }
+  .url { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); word-break: break-all; margin-top: .7rem; }
+  .url a { color: var(--blue); }
+  .warn { max-width: 720px; margin: 0 auto 1.4rem; background: #3a0d0f; border: 1px solid var(--red); border-radius: .8rem; padding: .9rem 1.1rem; }
+  .steps { max-width: 720px; margin: 1.6rem auto 0; color: var(--muted); line-height: 1.6; }
+</style>
+</head>
+<body>
+  <h1>FLAGZERO · JOIN</h1>
+  <p class="sub">Scan with the phone's camera, open the link, then tap START.</p>
+  <div id="warn"></div>
+  <div class="cards" id="cards"></div>
+  <ol class="steps">
+    <li>iPhone: open in <b>Safari</b> and tap <b>Allow</b> for motion access. Android: open in <b>Chrome</b>.</li>
+    <li>Keep the page open and the screen on during the demo; turn the silent switch off for sound.</li>
+    <li>The tunnel address changes every time the tunnel restarts. Reload this page and scan again.</li>
+  </ol>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    // Built from this page's own address, so the QR codes always match the current tunnel URL.
+    const origin = location.origin;
+    const targets = [
+      { title: "Car #17", role: "Crash car · iPhone", url: `${origin}/car?car=17` },
+      { title: "Car #21", role: "Approaching car · OnePlus", url: `${origin}/car?car=21` },
+      { title: "Dashboard", role: "Race control · any screen", url: `${origin}/dashboard` },
+    ];
+    const local = /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(location.hostname);
+    if (local || location.protocol !== "https:") {
+      document.getElementById("warn").innerHTML = `<div class="warn"><b>Phones can't use this address.</b>
+        You opened the join page via <code>${location.host}</code>. Open it through the tunnel's
+        <code>https://….trycloudflare.com/join</code> address instead (the launcher prints it), so the QR codes point
+        somewhere phones can reach, over https, which iPhones need for motion sensors.</div>`;
+    }
+    const cards = document.getElementById("cards");
+    for (const t of targets) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<h2>${t.title}</h2><div class="role">${t.role}</div><div class="qr"></div>
+        <div class="url"><a href="${t.url}">${t.url}</a></div>`;
+      cards.appendChild(card);
+      const box = card.querySelector(".qr");
+      if (window.QRCode) new QRCode(box, { text: t.url, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M });
+      else box.textContent = "QR library didn't load (offline?). Type the link below instead.";
+    }
+  </script>
+</body>
+</html>

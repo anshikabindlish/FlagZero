@@ -71,7 +71,8 @@ MARSHAL_FLAG_S = (0.5, 1.5)
 
 # ---------------------------------------------------------------- Monte Carlo (A5)
 MC_N = 10_000
-MC_GAP_S = (0.8, 3.0)
+MC_GAP_S = (1.0, 10.0)           # how far behind the next car is. 0.8-3 s alone is 'too close for any system';
+                                 # 20 cars on a ~80 s lap spread ~1-10 s apart (dashboard also shows per-gap bands)
 MC_SPEED_KMH = (150.0, 250.0)
 MC_SIGHTLINE_M = (50.0, 250.0)
 MC_BRAKE_G = (1.0, 1.5)

@@ -434,6 +434,173 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
+// ---- panels 8-9: proof (Monte Carlo via GET /api/montecarlo) ---------------------
+// Sliders re-run the server's Monte Carlo; seed is fixed so dragging back gives the same numbers.
+// If the API is down, the last saved run (/api/montecarlo/last) is shown instead.
+const MC_N = 10000, MC_SEED = 42;
+const SLIDERS = [
+  { id: "speed", label: "Approach speed", min: 120, max: 300, step: 10, value: 200, unit: "km/h",
+    params: (v) => ({ speed_min: Math.max(60, v - 50), speed_max: v + 50 }) },
+  { id: "gap", label: "Next car up to", min: 3, max: 15, step: 1, value: 10, unit: "s behind",
+    params: (v) => ({ gap_min: 1, gap_max: v }) },
+  { id: "sight", label: "Sightline up to", min: 60, max: 400, step: 10, value: 250, unit: "m",
+    params: (v) => ({ sightline_min: 50, sightline_max: v }) },
+  { id: "react", label: "Marshal reaction up to", min: 1, max: 5, step: 0.1, value: 2.5, unit: "s",
+    params: (v) => ({ marshal_react_min: 0.8, marshal_react_max: v }) },
+  { id: "vis", label: "Marshal can see it", min: 0, max: 100, step: 5, value: 50, unit: "%",
+    params: (v) => ({ visibility: v / 100 }) },
+];
+const GAP_BANDS = [[0.8, 2], [2, 4], [4, 6], [6, 10], [10, 15]];
+const MC_ROWS = [
+  ["Warned before reaching the hazard", "warned_before_hazard_pct", (x) => x.toFixed(1) + "%", "high"],
+  ["Secondary-impact scenarios", "secondary_impact_pct", (x) => x.toFixed(1) + "%", "low"],
+  ["Median time to warn the driver", "median_time_to_warn_s", (x) => x.toFixed(2) + " s", "low"],
+  ["Average warning before arrival", "avg_warning_time_s", (x) => x.toFixed(2) + " s", "high"],
+  ["Worst case (5th pct) warning", "p5_warning_time_s", (x) => x.toFixed(2) + " s", "high"],
+  ["Average speed at the hazard", "avg_speed_at_hazard_kmh", (x) => Math.round(x) + " km/h", "low"],
+  ["False yellows per hour*", "false_yellows_per_hour", (x) => x.toFixed(1), "low"],
+];
+let mcResult = null, mcBands = null, mcTimer = null, mcSeq = 0;
+
+function sliderParams() {
+  const out = {};
+  for (const sl of SLIDERS) Object.assign(out, sl.params(Number($("sl_" + sl.id).value)));
+  return out;
+}
+
+function mcUrl(extra) {
+  const q = new URLSearchParams({ n: MC_N, seed: MC_SEED, ...sliderParams(), ...extra });
+  return "/api/montecarlo?" + q.toString();
+}
+
+async function runMonteCarlo() {
+  const seq = ++mcSeq;
+  $("mcInfo").textContent = "running…";
+  try {
+    const main = await getJson(mcUrl({}));
+    if (seq !== mcSeq) return;
+    mcResult = main;
+    $("mcInfo").textContent = `${main.n.toLocaleString()} simulated incidents · ${main.runtime_ms} ms`;
+    renderMonteCarlo();
+    const bands = await Promise.all(GAP_BANDS.map(([a, b]) => getJson(mcUrl({ gap_min: a, gap_max: b, n: 4000 }))));
+    if (seq !== mcSeq) return;
+    mcBands = bands.map((r, i) => ({ band: GAP_BANDS[i], base: r.baseline.secondary_impact_pct, fz: r.flagzero.secondary_impact_pct }));
+    drawBands();
+  } catch (e) {
+    try {
+      mcResult = await getJson("/api/montecarlo/last");
+      $("mcInfo").textContent = "live API unavailable · showing the last saved run";
+      renderMonteCarlo();
+    } catch (e2) {
+      $("mcInfo").textContent = "Monte Carlo needs the server (/api/montecarlo)";
+    }
+  }
+}
+
+function renderMonteCarlo() {
+  const r = mcResult;
+  if (!r) return;
+  const b = r.baseline, f = r.flagzero;
+  const cut = b.secondary_impact_pct > 0 ? (1 - f.secondary_impact_pct / b.secondary_impact_pct) * 100 : 0;
+  $("mcHeadline").innerHTML = `
+    <div><div class="big">${cut >= 0 ? "−" : "+"}${Math.abs(cut).toFixed(0)}%</div><div class="cap">secondary impacts</div></div>
+    <div><div class="big">${(b.median_time_to_warn_s / Math.max(0.01, f.median_time_to_warn_s)).toFixed(0)}×</div><div class="cap">faster warning</div></div>
+    <div><div class="big">${Math.round(b.avg_speed_at_hazard_kmh)}→${Math.round(f.avg_speed_at_hazard_kmh)}</div><div class="cap">km/h at the hazard</div></div>`;
+  $("mcTable").innerHTML = `<table><thead><tr><th></th><th>Marshal</th><th>FlagZero</th></tr></thead><tbody>${
+    MC_ROWS.map(([label, key, fmt, better]) => {
+      const bv = b[key], fv = f[key];
+      const fzWins = better === "high" ? fv > bv : fv < bv;
+      return `<tr><td>${label}</td><td class="${fzWins ? "" : "win"}">${fmt(bv)}</td><td class="${fzWins ? "win" : ""}">${fmt(fv)}</td></tr>`;
+    }).join("")
+  }</tbody></table><div class="note">* placeholder until the phone tuning session measures real false-event rates. FlagZero missed every sensor in ${(f.all_sources_missed_pct ?? 0).toFixed(1)}% of runs and fell back to the marshal.</div>`;
+  drawTimeline();
+}
+
+function drawTimeline() {
+  const c = $("timeline");
+  const { ctx, w, h } = fitCanvas(c);
+  ctx.clearRect(0, 0, w, h);
+  const tl = mcResult && mcResult.timeline;
+  if (!tl || w < 10) return;
+  const react = 1.1; // median driver reaction (MC_DRIVER_REACT_S 0.7-1.5)
+  const mTot = tl.marshal.total_s, fTot = tl.flagzero.total_s ?? mTot;
+  const arrive = tl.car_reaches_hazard_s;
+  const tMax = Math.ceil(Math.max(mTot + react, arrive, 4) + 0.5);
+  const left = 92, right = 12, X = (t) => left + (t / tMax) * (w - left - right);
+  const rows = [
+    { name: "Human marshal", y: 22, segs: [["sees it", tl.marshal.see_s, "#5b6573"], ["reacts", tl.marshal.react_s, "#b08a00"], ["waves flag", tl.marshal.flag_s, "#ffd400"]] },
+    { name: "FlagZero", y: 78, segs: [["detects", tl.flagzero.detect_s ?? 0.3, "#4aa3ff"], ["network", tl.flagzero.network_s ?? 0.15, "#c38cff"]] },
+  ];
+  ctx.font = "700 12px system-ui"; ctx.textBaseline = "middle";
+  for (const row of rows) {
+    ctx.fillStyle = "#e8ecf1"; ctx.textAlign = "left"; ctx.fillText(row.name, 0, row.y + 12);
+    let t = 0;
+    for (const [label, dur, color] of row.segs) {
+      ctx.fillStyle = color; ctx.fillRect(X(t), row.y, Math.max(2, X(t + dur) - X(t)), 24);
+      if (X(t + dur) - X(t) > 44) { ctx.fillStyle = "#111"; ctx.textAlign = "center"; ctx.fillText(label, (X(t) + X(t + dur)) / 2, row.y + 12); }
+      t += dur;
+    }
+    // driver reaction after the warning
+    ctx.fillStyle = "rgba(232,236,241,.18)"; ctx.fillRect(X(t), row.y, X(t + react) - X(t), 24);
+    ctx.fillStyle = "#8a95a3"; ctx.textAlign = "left"; ctx.fillText(`warned at ${t.toFixed(1)} s · driver reacts`, X(t) + 4, row.y + 36);
+  }
+  // when the median following car reaches the hazard
+  ctx.strokeStyle = "#ff5a5f"; ctx.setLineDash([5, 4]); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(X(arrive), 8); ctx.lineTo(X(arrive), h - 18); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#ff5a5f"; ctx.textAlign = X(arrive) > w - 120 ? "right" : "left";
+  ctx.fillText(`next car arrives ${arrive.toFixed(1)} s`, X(arrive) + (X(arrive) > w - 120 ? -4 : 4), 8);
+  // axis
+  ctx.fillStyle = "#8a95a3"; ctx.font = "11px system-ui"; ctx.textAlign = "center";
+  for (let s = 0; s <= tMax; s++) ctx.fillText(`${s} s`, X(s), h - 8);
+}
+
+function drawBands() {
+  const { ctx, w, h } = fitCanvas($("bands"));
+  ctx.clearRect(0, 0, w, h);
+  if (!mcBands || w < 10) return;
+  const left = 36, bottom = 36, top = 18, pw = w - left - 8, ph = h - top - bottom;
+  const Y = (pct) => top + ph - (pct / 100) * ph;
+  ctx.font = "11px system-ui"; ctx.fillStyle = "#8a95a3"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let p = 0; p <= 100; p += 25) {
+    ctx.strokeStyle = "#232a33"; ctx.beginPath(); ctx.moveTo(left, Y(p)); ctx.lineTo(w - 8, Y(p)); ctx.stroke();
+    ctx.fillText(p + "%", left - 4, Y(p));
+  }
+  const slot = pw / mcBands.length, bw = Math.min(28, slot / 3);
+  mcBands.forEach((b, i) => {
+    const cx = left + slot * (i + 0.5);
+    ctx.fillStyle = "#5b6573"; ctx.fillRect(cx - bw - 2, Y(b.base), bw, Y(0) - Y(b.base));
+    ctx.fillStyle = "#4aa3ff"; ctx.fillRect(cx + 2, Y(b.fz), bw, Y(0) - Y(b.fz));
+    ctx.fillStyle = "#e8ecf1"; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.font = "700 11px system-ui";
+    ctx.fillText(Math.round(b.base), cx - bw / 2 - 2, Y(b.base) - 2);
+    ctx.fillText(Math.round(b.fz), cx + bw / 2 + 2, Y(b.fz) - 2);
+    ctx.fillStyle = "#8a95a3"; ctx.textBaseline = "top"; ctx.font = "11px system-ui";
+    ctx.fillText(`${b.band[0]}–${b.band[1]} s`, cx, h - bottom + 6);
+  });
+  ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = "700 11px system-ui";
+  ctx.fillStyle = "#5b6573"; ctx.fillRect(left, h - 14, 10, 10); ctx.fillText("Marshal", left + 14, h - 15);
+  ctx.fillStyle = "#4aa3ff"; ctx.fillRect(left + 80, h - 14, 10, 10); ctx.fillText("FlagZero", left + 94, h - 15);
+  ctx.fillStyle = "#8a95a3"; ctx.textAlign = "right"; ctx.font = "11px system-ui";
+  ctx.fillText("under ~2 s: too close for any system", w - 8, 0);
+}
+
+function buildSliders() {
+  $("sliders").innerHTML = SLIDERS.map((sl) => `
+    <span class="k">${sl.label}</span>
+    <input type="range" id="sl_${sl.id}" min="${sl.min}" max="${sl.max}" step="${sl.step}" value="${sl.value}">
+    <output id="out_${sl.id}">${sl.value} ${sl.unit}</output>`).join("");
+  for (const sl of SLIDERS) {
+    $("sl_" + sl.id).addEventListener("input", (ev) => {
+      $("out_" + sl.id).textContent = `${ev.target.value} ${sl.unit}`;
+      clearTimeout(mcTimer);
+      mcTimer = setTimeout(runMonteCarlo, 250);
+    });
+  }
+}
+
+buildSliders();
+runMonteCarlo();
+window.addEventListener("resize", () => { drawTimeline(); drawBands(); });
+
 // ---- buttons + clock ----------------------------------------------------------
 $("confirmRed").addEventListener("click", () => send({ type: "confirm_red" }));
 $("resetBtn").addEventListener("click", () => send({ type: "reset" }));

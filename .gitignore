@@ -51,3 +51,6 @@ flagzero/vision/frames/*
 # Logs and run artifacts
 *.log
 flagzero/logs/
+
+# written by tools/start_demo.py
+results/tunnel_url.txt
