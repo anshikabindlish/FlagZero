@@ -1,0 +1,61 @@
+{
+  "n": 10000,
+  "seed": 42,
+  "params": {
+    "gap_min": 1.0,
+    "gap_max": 10.0,
+    "speed_min": 150.0,
+    "speed_max": 250.0,
+    "sightline_min": 50.0,
+    "sightline_max": 250.0,
+    "brake_min": 1.0,
+    "brake_max": 1.5,
+    "driver_react_min": 0.7,
+    "driver_react_max": 1.5,
+    "marshal_react_min": 0.8,
+    "marshal_react_max": 2.5,
+    "visibility": 0.5,
+    "imu_fn": 0.1,
+    "camera_fn": 0.05,
+    "camera_coverage": 0.8,
+    "network_min": 0.05,
+    "network_max": 0.3
+  },
+  "baseline": {
+    "warned_before_hazard_pct": 48.43,
+    "secondary_impact_pct": 54.910000000000004,
+    "avg_warning_time_s": -0.1714400364133884,
+    "p5_warning_time_s": -6.740529902159319,
+    "median_time_to_warn_s": 4.618091716457425,
+    "avg_speed_at_hazard_kmh": 92.3098937616557,
+    "false_yellows_per_hour": 0.0
+  },
+  "flagzero": {
+    "warned_before_hazard_pct": 98.5,
+    "secondary_impact_pct": 26.229999999999997,
+    "avg_warning_time_s": 4.894763054578568,
+    "p5_warning_time_s": 0.8113466164132307,
+    "median_time_to_warn_s": 0.4872726347734952,
+    "avg_speed_at_hazard_kmh": 43.2689502653711,
+    "false_yellows_per_hour": 1.3499999999999999,
+    "all_sources_missed_pct": 2.31
+  },
+  "timeline": {
+    "marshal": {
+      "see_s": 3.035728800313355,
+      "react_s": 1.640378155074339,
+      "flag_s": 0.9996929123198048,
+      "total_s": 4.988371653968737
+    },
+    "flagzero": {
+      "detect_s": 0.3,
+      "network_s": 0.17319560123204755,
+      "total_s": 0.4872726347734952
+    },
+    "car_reaches_hazard_s": 5.568882128882148
+  },
+  "notes": {
+    "false_yellows": "placeholder rates in config.py until the tuning session measures them"
+  },
+  "runtime_ms": 33.2
+}
