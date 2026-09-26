@@ -45,19 +45,21 @@ async def run(scene: int, base: str) -> None:
             await ws.send(json.dumps({"type": "hello", "car": car, "platform": plat}))
         await d.send(json.dumps({"type": "scene", "n": scene}))
         await asyncio.sleep(0.5)
+        st0 = await wait_state(d, lambda s: s["cars"])
+        pos17 = round(next(c["track_m"] for c in st0["cars"] if c["car"] == 17), 1)
 
         async def cam(hazards, cars=()):
             await v.send(json.dumps({"type": "vision", "camera": 1, "cars": list(cars),
                                      "hazards": hazards, "occluded": False}))
 
         if scene == 1:
-            print("judge drops paper at T4 ...")
+            print(f"judge drops paper on the track at {pos17} m ...")
             for _ in range(20):
-                await cam([{"kind": "DEBRIS", "track_m": 1423, "conf": 0.9}])
+                await cam([{"kind": "DEBRIS", "track_m": pos17, "conf": 0.9}])
                 await asyncio.sleep(0.1)
             st = await wait_state(d, lambda s: s["incidents"])
         else:
-            car17 = [{"car": 17, "track_m": 1423.0, "speed_px_s": 0, "stationary_s": 0}]
+            car17 = [{"car": 17, "track_m": pos17, "speed_px_s": 0, "stationary_s": 0}]
             print("car 17 stops on the paper, phone dropped on the cushion ...")
             await cam([], car17)
             await p17.send(json.dumps({"type": "imu_event", "car": 17, "cls": "IMPACT", "peak_g": 5.2,
@@ -66,7 +68,7 @@ async def run(scene: int, base: str) -> None:
             await asyncio.sleep(1.5)
             await p17.send(json.dumps({"type": "imu_update", "car": 17, "still": True}))
             for _ in range(10):
-                await cam([{"kind": "STOPPED_VEHICLE", "car": 17, "track_m": 1423, "conf": 0.93}], car17)
+                await cam([{"kind": "STOPPED_VEHICLE", "car": 17, "track_m": pos17, "conf": 0.93}], car17)
                 await asyncio.sleep(0.1)
             print("nobody presses OK within 15 s (phone reports TIMEOUT) ...")
             await p17.send(json.dumps({"type": "countdown_result", "car": 17, "result": "TIMEOUT"}))

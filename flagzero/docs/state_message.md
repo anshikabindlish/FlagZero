@@ -29,7 +29,7 @@ Everything the dashboard needs arrives on `/ws/dash` as a `"state"` message 10 t
 | 2 Approaching cars | `incidents[0].approaching` (already sorted by ETA) |
 | 3 Driver status | `vitals["17"]` (always show a SIM badge), `incidents[0].countdown_left_s` (15 -> 0) |
 | 4 Red flag banner | `red_confirmed` = RED is out. `red_auto: true` means it went out automatically because the driver did not press OK within 15 s. `red_pending` = severity 4 without a timeout, waiting for a manual Confirm red (`{"type":"confirm_red"}`) |
-| 5 Track map | shape from `GET /api/track` (`polyline` x/y, `corners`, `paper_track`), dots from `cars` |
+| 5 Track map | shape from `GET /api/track` (`polyline` x/y, `corners`), dots from `cars` |
 | 6 g-force trace | `latency.tel["17"].g` |
 | 7 Latency | `latency.tunnel_rtt_ms`, `latency.last_detect_to_warn_ms` |
 | 8 Timeline + sliders | `GET /api/montecarlo?n=10000&visibility=0.5&marshal_react_max=2.5&speed_min=150&speed_max=250&sightline_min=50&sightline_max=250` → `timeline` |
@@ -39,4 +39,4 @@ Warning levels on `cars[].warning`: 0 NORMAL, 1 CAUTION, 2 YELLOW, 3 DBL YELLOW,
 
 ## Dashboard → server
 
-`{"type":"confirm_red"}`, `{"type":"reset"}`, and `{"type":"scene","n":1}` or `{"type":"scene","n":2}`. A scene message resets everything and puts car 21 about 700 m before T4, so its warning counts down live.
+`{"type":"confirm_red"}`, `{"type":"reset"}`, and `{"type":"scene","n":1}` or `{"type":"scene","n":2}`. A scene message resets everything and lines car 21 up about 9 s behind car 17, wherever car 17 is on the lap, so car 21 is the next car to reach anything that happens to car 17. No corner is special.

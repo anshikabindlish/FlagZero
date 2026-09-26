@@ -60,9 +60,7 @@ HR_RAMP_S = 5.0
 SPO2 = (96, 98)
 
 # ---------------------------------------------------------------- demo scenes (A4)
-SCENE_CAR21_BEFORE_T4_M = 1300.0 # car 21 starts this far before T4 (Interlagos: ~9 s behind car 17)
-SCENE_CAR17_AT_M = 590.0         # car 17 starts ~800 m (~12 s) before T4, so a phone crash can land at T4;
-                                 # once the camera sees the pink car it owns car 17's position anyway
+SCENE_CAR21_BEHIND_S = 9.0       # a scene lines car 21 up this many seconds behind car 17, wherever car 17 is
 
 # ---------------------------------------------------------------- marshal baseline (A4/A5)
 MARSHAL_SEE_VISIBLE_S = (0.2, 1.0)   # post can see the spot

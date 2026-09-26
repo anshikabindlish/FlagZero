@@ -4,8 +4,8 @@ flagzero/tools/export_track.py -- build flagzero/track.json from real F1 data (P
 Uses FastF1 (official F1 timing/position data) to export the real Interlagos
 (Autodromo Jose Carlos Pace, Sao Paulo) layout in the format core/track.py reads:
 the pole lap's X/Y trace ("polyline", s = lap distance), the official corner
-positions with a target speed taken from the real lap, the paper-track window
-and evenly spaced marshal posts. The raw speed trace is kept too.
+positions with a target speed taken from the real lap and evenly spaced marshal
+posts. The raw speed trace is kept too. No corner is special.
 
 Only needed to regenerate track.json; the file is committed, so nobody else
 needs FastF1 installed.
@@ -29,14 +29,12 @@ NAMES = {1: "S do Senna", 2: "S do Senna", 3: "Curva do Sol", 4: "Descida do Lag
          6: "Ferradura", 7: "Ferradura", 8: "Laranjinha", 9: "Pinheirinho", 10: "Bico de Pato",
          11: "Mergulho", 12: "Junção", 13: "Subida dos Boxes", 14: "Subida dos Boxes", 15: "Subida dos Boxes"}
 
-DEMO_CORNER = "T4"        # where the paper track / camera sits in the demo
-PAPER_HALF_WIDTH_M = 50   # the paper track covers DEMO_CORNER +- this
 STEP_M = 10               # resample spacing
 RACE_PACE = 0.92          # corner target speeds = qualifying minimum x this
 CORNER_WINDOW_M = 80      # look for the slowest point within this of each corner
 MARSHAL_POSTS = 8
-# Assumed sightlines (m). Not measured: T4 is the demo's "blind" corner, the rest are rough guesses.
-SIGHTLINE_M = {"T1": 250, "T2": 120, "T3": 180, "T4": 90, "T5": 150, "T6": 160, "T7": 120, "T8": 130,
+# Assumed sightlines (m): rough guesses, not measured.
+SIGHTLINE_M = {"T1": 250, "T2": 120, "T3": 180, "T4": 180, "T5": 150, "T6": 160, "T7": 120, "T8": 130,
                "T9": 110, "T10": 100, "T11": 140, "T12": 120, "T13": 200, "T14": 220, "T15": 250}
 
 
@@ -80,7 +78,6 @@ def main():
             "note": NAMES.get(n, ""),
         })
 
-    demo = next(c for c in corners if c["name"] == DEMO_CORNER)
     spacing = lap_m / MARSHAL_POSTS
     track = {
         "name": "Autódromo José Carlos Pace (Interlagos), São Paulo",
@@ -91,18 +88,16 @@ def main():
         "polyline": [{"x": round(float(a), 1), "y": round(float(b), 1), "s": round(float(s), 1)}
                      for a, b, s in zip(xs, ys, grid)],
         "corners": corners,
-        "paper_track": {"from_m": round(demo["s"] - PAPER_HALF_WIDTH_M), "to_m": round(demo["s"] + PAPER_HALF_WIDTH_M),
-                        "corner": DEMO_CORNER},
         "marshal_posts": [{"id": f"M{i + 1}", "s": round(spacing * (i + 0.5)),
                            "covers_from_m": round(spacing * i), "covers_to_m": round(spacing * (i + 1))}
                           for i in range(MARSHAL_POSTS)],
         "speed_profile_kmh": [[round(float(s), 1), round(float(sp))] for s, sp in zip(grid, vs)],
         "notes": "Positions are metres along the lap from the timing line. target_kmh = the real qualifying lap's "
-                 "slowest point near each corner x 0.92. Sightlines are assumptions (T4 is the demo's blind corner).",
+                 "slowest point near each corner x 0.92. Sightlines are rough assumptions.",
     }
     OUT.write_text(json.dumps(track, indent=1), encoding="utf-8")
     print(f"wrote {OUT}: {lap_m:.0f} m, {len(track['polyline'])} points, {len(corners)} corners, "
-          f"{DEMO_CORNER} at {demo['s']} m, paper track {track['paper_track']}")
+          f"no special corner")
     for c in corners:
         print(f"  {c['name']:4} {c['s']:7.1f} m  {c['target_kmh']:4} km/h  sightline {c['sightline_m']:3} m  {c['note']}")
 

@@ -2162,7 +2162,7 @@
    "name": "T4",
    "s": 1389.4,
    "target_kmh": 155,
-   "sightline_m": 90,
+   "sightline_m": 180,
    "note": "Descida do Lago"
   },
   {
@@ -2243,11 +2243,6 @@
    "note": "Subida dos Boxes"
   }
  ],
- "paper_track": {
-  "from_m": 1339,
-  "to_m": 1439,
-  "corner": "T4"
- },
  "marshal_posts": [
   {
    "id": "M1",
@@ -4000,5 +3995,5 @@
    327
   ]
  ],
- "notes": "Positions are metres along the lap from the timing line. target_kmh = the real qualifying lap's slowest point near each corner x 0.92. Sightlines are assumptions (T4 is the demo's blind corner)."
+ "notes": "Positions are metres along the lap from the timing line. target_kmh = the real qualifying lap's slowest point near each corner x 0.92. Sightlines are rough assumptions."
 }

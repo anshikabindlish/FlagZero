@@ -44,10 +44,8 @@ function builtInTrack() {
     raw.push({ x: Math.cos(a) * r * 1.5, y: Math.sin(a) * r });
   }
   return withDistances(raw, 4000, {
-    corners: [["T1", 280], ["T2", 760], ["T3", 1130], ["T4", 1423, 90], ["T5", 1900], ["T6", 2420], ["T7", 3020], ["T8", 3580]]
-      .map(([name, m, sightline]) => ({ name, m, sightline, label: name === "T4" ? "blind crest" : "" })),
-    paper: [1380, 1480],
-    demo: "T4",
+    corners: [["T1", 280], ["T2", 760], ["T3", 1130], ["T4", 1423], ["T5", 1900], ["T6", 2420], ["T7", 3020], ["T8", 3580]]
+      .map(([name, m]) => ({ name, m, label: "" })),
     source: "built-in layout",
   });
 }
@@ -71,9 +69,7 @@ function parseTrack(j) {
     name: c.name ?? c.id, m: c.s ?? c.pos_m ?? c.lap_m ?? c.track_m ?? c.position_m ?? c.m,
     sightline: c.sightline_m ?? c.sightline, label: c.label ?? c.note ?? "",
   }));
-  const pw = j.paper_window ?? j.paper_track ?? j.paper_window_m;
-  const paper = Array.isArray(pw) ? pw : pw ? [pw.start_m ?? pw.from_m ?? pw.start, pw.end_m ?? pw.to_m ?? pw.end] : [1380, 1480];
-  const extra = { corners, paper, demo: j.demo_corner ?? (pw && pw.corner) ?? "T4", name: j.name, source: "track.json" };
+  const extra = { corners, name: j.name, source: "track.json" };
   if (pts.some((p) => p.d == null)) return withDistances(pts, lap, extra);
   pts.sort((a, b) => a.d - b.d);
   return { lap, pts, ...extra };
@@ -327,31 +323,18 @@ function drawMap() {
   ctx.strokeStyle = "#2c343e"; ctx.lineWidth = 18; ctx.stroke();
   ctx.strokeStyle = "#4a5462"; ctx.lineWidth = 1.5; ctx.stroke();
 
-  // paper-track window (what the camera sees)
-  const [p0, p1] = track.paper;
-  path(p0, upstream(p0, p1), 2);
-  ctx.strokeStyle = "rgba(74,163,255,.5)"; ctx.lineWidth = 26; ctx.stroke();
-
   // start / finish
   { const [x, y] = P(0); ctx.fillStyle = "#e8ecf1"; ctx.fillRect(x - 2, y - 11, 4, 22);
     const [lx, ly] = outward(x, y, 30); ctx.fillStyle = "#8a95a3"; ctx.font = "600 11px system-ui"; ctx.textAlign = "center"; ctx.fillText("S/F", lx, ly + 4); }
 
   // corners
   ctx.textAlign = "center";
+  ctx.fillStyle = "#8a95a3"; ctx.font = "600 11px system-ui";
   for (const c of track.corners) {
     if (c.m == null) continue;
     const [x, y] = P(c.m);
-    const isDemo = c.name === track.demo;
-    const [lx, ly] = outward(x, y, isDemo ? 42 : 24);
-    ctx.fillStyle = isDemo ? "#ffd400" : "#8a95a3";
-    ctx.font = isDemo ? "800 14px system-ui" : "600 11px system-ui";
+    const [lx, ly] = outward(x, y, 24);
     ctx.fillText(c.name, lx, ly + 4);
-    if (isDemo) {
-      ctx.font = "600 11px system-ui";
-      const sub = [c.label, c.sightline ? `${c.sightline} m sightline` : ""].filter(Boolean).join(" · ");
-      if (sub) ctx.fillText(sub, lx, ly + 19);
-      ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.strokeStyle = "#ffd400"; ctx.lineWidth = 2; ctx.stroke();
-    }
   }
 
   const s = latest || {};
@@ -466,7 +449,7 @@ setInterval(() => {
 }, 500);
 
 // ---- ?mock=1: fake state so the dashboard works without a server ---------------
-// 40 s loop: green -> crash at T4 (8 s) -> camera confirms (10 s) -> then either
+// 40 s loop: green -> car 17 crashes wherever it is (8 s) -> camera confirms (10 s) -> then either
 // no response for 15 s -> AUTO RED (odd loops), or the driver asks for red -> Confirm red (even loops).
 let mock = null;
 function mockHandle(msg) {
@@ -475,8 +458,8 @@ function mockHandle(msg) {
 }
 
 function mockTick() {
-  const HZ = (track.corners.find((c) => c.name === track.demo) || { m: 1423 }).m;
   let t = (Date.now() - mock.t0) / 1000;
+  const HZ = wrap(1300 + 8 * 165 / 3.6);   // where car 17 happens to be when it crashes at 8 s
   if (t > 40) { mock.t0 = Date.now(); mock.confirmed = false; mock.loop++; t = 0; }
   const noResponse = mock.loop % 2 === 0;
   const crashed = t > 8;
@@ -500,7 +483,8 @@ function mockTick() {
     const sources = ["IMU", ...(t > 10 ? ["CAMERA"] : []), ...(noResponse && t >= 23 ? ["NO_RESPONSE"] : []), ...(!noResponse && t >= 14 ? ["DRIVER"] : [])];
     const sev4 = noResponse ? t >= 23 : t >= 14;
     state.incidents.push({
-      id: "mock-" + mock.loop, kind: t > 10 ? "DISABLED_VEHICLE" : "IMPACT", car: 17, corner: "T4", track_m: HZ,
+      id: "mock-" + mock.loop, kind: t > 10 ? "DISABLED_VEHICLE" : "IMPACT", car: 17,
+      corner: (track.corners.reduce((a, c) => (Math.abs(c.m - HZ) < Math.abs(a.m - HZ) ? c : a), track.corners[0]) || {}).name, track_m: HZ,
       severity: sev4 ? 4 : 3, fused_conf: t > 10 ? 0.9916 : 0.88, sources, medical,
       created_ms: mock.t0 + 8000, updated_ms: Date.now(),
     });

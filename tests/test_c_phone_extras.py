@@ -68,15 +68,56 @@ def test_green_flag_resets_everything(eng):
     assert {c for c, m in out if m["type"] == "reset"} == PHONES
 
 
+def test_scene_puts_car21_about_9s_behind_car17(eng):
+    e = eng
+    before = {n: c.track_m for n, c in e.world.cars.items()}
+    e.on_dash({"type": "scene", "n": 2}, PHONES)
+    c17, c21 = e.world.cars[17], e.world.cars[21]
+    assert c17.track_m == before[17]                        # car 17 is not moved
+    gap = upstream_distance(c21.track_m, c17.track_m, e.sim.lap)
+    assert 200 < gap < 9 * 90                               # ~9 s of driving at race speeds
+
+
+def test_ok_under_yellow_car17_drives_on(eng):
+    e = eng
+    crash(e)
+    pos = e.world.cars[17].track_m
+    e.on_car(17, {"type": "ok_pressed"}, 2000)
+    e.on_car(17, {"type": "countdown_result", "result": "OK"}, 2000)
+    assert e.world.incidents and not e.world.red_confirmed  # yellows stay out
+    for k in range(40):                                     # 2 s
+        e.tick(0.05, PHONES, now_s=1 + k * 0.05, t_ms=2000 + k * 50)
+    c17 = e.world.cars[17]
+    assert c17.speed_mps > 0 and upstream_distance(pos, c17.track_m, e.sim.lap) > 5
+
+
+def test_car17_stays_stopped_for_red(eng):
+    e = eng
+    crash(e)
+    e.on_car(17, {"type": "ok_pressed"}, 2000)
+    e.on_car(17, {"type": "driver_request", "request": "RED_FLAG"}, 2500)   # OK, but wants red
+    for k in range(40):
+        e.tick(0.05, PHONES, now_s=1 + k * 0.05, t_ms=3000 + k * 50)
+    assert e.world.cars[17].speed_mps == 0
+    e2_pos = e.world.cars[17].track_m
+    crash_no_ok = e.world.cars[17]
+    assert crash_no_ok.track_m == e2_pos
+
+
+def test_car17_stays_stopped_without_ok(eng):
+    e = eng
+    crash(e)
+    e.on_car(17, {"type": "countdown_result", "result": "TIMEOUT"}, 16000)
+    for k in range(40):
+        e.tick(0.05, PHONES, now_s=1 + k * 0.05, t_ms=16000 + k * 50)
+    assert e.world.cars[17].speed_mps == 0 and e.world.red_confirmed
+
+
 def test_car21_slows_for_double_yellow_and_drives_past(eng):
     e = eng
-    e.on_dash({"type": "scene", "n": 2}, PHONES)
+    e.on_dash({"type": "scene", "n": 2}, PHONES)            # car 21 ~9 s behind car 17
     lap = e.sim.lap
-    t4 = e.sim.track.corner("T4").s
-    # crash car 17 at T4 with a strong impact (severity 3 -> DBL YELLOW)
-    e.world.cars[17].track_m = t4
-    crash(e, peak_g=9.5)
-    e.on_car(17, {"type": "ok_pressed"}, 1500)              # driver OK, so no automatic red
+    crash(e, peak_g=9.5)                                    # strong impact wherever car 17 is: severity 3
     inc = e.world.incidents[0]
     assert inc.severity == 3
     in_zone_speeds, passed, now, t = [], False, 1.0, 1000
@@ -94,4 +135,4 @@ def test_car21_slows_for_double_yellow_and_drives_past(eng):
             break
     assert in_zone_speeds and max(in_zone_speeds) <= 120 + 1
     assert passed and e.world.cars[21].speed_mps > 0         # kept driving
-    assert e.world.cars[17].speed_mps == 0                   # crashed car still where it stopped
+    assert e.world.cars[17].speed_mps == 0                   # no I'm OK yet: crashed car still where it stopped

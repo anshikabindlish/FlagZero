@@ -5,7 +5,9 @@
 > - `core/severity.py`: a `DRIVER`/`RED_FLAG` source → severity 4 (RED FLAG RECOMMENDED, waits for Confirm red).
 > - `core/router.py` + `config.py`: `ROUTER_FLAG_ZONE_M = 500` (inside it a car always sees the incident's flag), `SPEED_CAP_KMH[3] = 120` (cars slow for DBL YELLOW and drive past), and scene positions retuned for Interlagos.
 > - `track.json` is now the real Interlagos (the generic circuit is kept as `track_generic.json`, and `tests/test_a1_sim.py` uses it for its generic-track checks).
-> - New tests: `tests/test_c_phone_extras.py`. All 55 tests pass.
+> - **No special corner:** T4 is an ordinary corner now. There's no paper-track window in `track.json`, nothing highlighted on the dashboard, and scenes line car 21 up ~9 s behind car 17 wherever it is (`SCENE_CAR21_BEHIND_S`). Person B: the camera's stretch of track is now purely your vision calibration's choice.
+> - **Driver OK = car rejoins:** after `ok_pressed` / `countdown_result OK`, the crashed car drives on under the current yellow/green flags (incident and flags stay until cleared). It stays stopped on TIMEOUT, on a red, or after `driver_request RED_FLAG`. The router only skips the crashed car while it's STOPPED.
+> - New tests: `tests/test_c_phone_extras.py`. All 59 tests pass.
 >
 > The page paths are `/car.js` and `/dashboard.js` (server.py serves `/<name>.js` from `web/`), and the dashboard reads `state_message.md` fields directly. Section 1 and parts of section 5 below describe the earlier stand-in server and are kept for reference.
 

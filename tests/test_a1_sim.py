@@ -51,11 +51,10 @@ def test_interlagos_track():
     t = default_track()
     assert "Interlagos" in t.raw["name"]
     assert [c.name for c in t.corners] == [f"T{i}" for i in range(1, 16)]
-    t4 = t.corner("T4")
-    assert 1300 < t4.s < 1450 and t4.sightline_m == 90
-    assert t.raw["paper_track"]["corner"] == "T4"
-    assert t.raw["paper_track"]["from_m"] < t4.s < t.raw["paper_track"]["to_m"]
-    assert t.nearest_corner(t4.s + 20).name == "T4"
+    assert [c.s for c in t.corners] == sorted(c.s for c in t.corners)
+    assert "paper_track" not in t.raw                     # no corner is special
+    for c in t.corners:
+        assert t.nearest_corner(c.s + 5).name == c.name
 
 
 def test_spawn():

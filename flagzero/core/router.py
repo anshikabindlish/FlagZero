@@ -18,7 +18,7 @@ import math
 from dataclasses import dataclass
 
 from flagzero import config
-from flagzero.core.state import Incident, WorldState
+from flagzero.core.state import STOPPED, Incident, WorldState
 from flagzero.core.track import upstream_distance
 
 NORMAL, CAUTION, YELLOW, DBL_YELLOW, SLOW_ZONE, RED = range(6)
@@ -71,8 +71,8 @@ def compute(world: WorldState, lap_len: float) -> dict[int, CarWarning]:
         max_level = config.SEVERITY_MAX_WARNING.get(inc.severity, NORMAL)
         rows = []
         for c in world.cars.values():
-            if c.car == inc.car:
-                continue                     # the crashed car gets the countdown, not warnings
+            if c.car == inc.car and c.state == STOPPED:
+                continue                     # the stopped crashed car gets the countdown, not warnings
             dist = upstream_distance(c.track_m, inc.track_m, lap_len)
             if dist > config.ROUTER_MAX_UPSTREAM_M:
                 continue
@@ -88,7 +88,8 @@ def compute(world: WorldState, lap_len: float) -> dict[int, CarWarning]:
         rows.sort(key=lambda r: (r["eta_s"] is None, r["eta_s"] or 0))
         inc.approaching = rows[:8]
     if world.red_confirmed:
-        crashed = {i.car for i in world.incidents if i.car is not None}
+        crashed = {i.car for i in world.incidents
+                   if i.car is not None and i.car in world.cars and world.cars[i.car].state == STOPPED}
         for n, cw in out.items():
             if n in crashed:
                 continue                     # its phone keeps the countdown / medical screen

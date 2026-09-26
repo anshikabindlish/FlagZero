@@ -57,18 +57,34 @@ class Engine:
             incidents.handle_imu_update(self.world, msg, t_ms)
         elif kind == "ok_pressed":
             out += incidents.handle_ok_pressed(self.world, msg, t_ms)
+            self._resume_if_ok(car)
         elif kind == "countdown_result":
             out += incidents.handle_countdown_result(self.world, msg, t_ms)
+            if str(msg.get("result", "")).upper() == "OK":
+                self._resume_if_ok(car)
         elif kind == "driver_request":                 # docs/phone_changes.md
-            if incidents.handle_driver_request(self.world, msg, t_ms) == "clear":
+            res = incidents.handle_driver_request(self.world, msg, t_ms)
+            if res == "clear":
                 log.info("car %s: false alarm -> green flag", car)
                 out += self.reset(set(self.world.car_sockets) | {car})
+            elif res == "red":
+                self.sim.stop_car(car)                 # driver wants red: they stay where they are
         elif kind == "green_flag":                     # phone's race-control button = dashboard reset
             out += self.reset(set(self.world.car_sockets) | {car})
         if kind not in ("tel", "ack"):
             log.info("car %s -> %s", car, msg)
         severity.update(self.world)
         return out
+
+    def _resume_if_ok(self, car: int) -> None:
+        """Driver pressed I'm OK. Under yellow or green the car drives on; the incident
+        and its flags stay out until race control clears them. Not if red is out or
+        recommended for this car's incident."""
+        severity.update(self.world)
+        if self.world.red_confirmed or any(i.car == car and i.severity >= 4 for i in self.world.incidents):
+            return
+        self.sim.release_car(car)
+        log.info("car %s: driver OK -> car rejoins under the current flags", car)
 
     def _on_ack(self, msg_id: int, t_ms: int) -> None:
         if msg_id in self._pings:
@@ -136,18 +152,20 @@ class Engine:
         return [(car, {"type": "reset"}) for car in connected]
 
     def position_scene(self, n: int) -> None:
-        """Put the phone cars where each demo scene needs them."""
-        t4 = self.sim.track.corner("T4").s
-        lap = self.sim.lap
+        """Line car 21 up SCENE_CAR21_BEHIND_S seconds behind car 17, wherever car 17 is on
+        the lap, so car 21 is the next car to reach anything that happens to car 17.
+        Nothing is tied to a particular corner; every other car stays where it is."""
         cars = self.world.cars
-        if 21 in cars:
-            cars[21].track_m = wrap(t4 - config.SCENE_CAR21_BEFORE_T4_M, lap)
-            cars[21].speed_mps = self.sim.v_allow(cars[21].track_m)
-        if 17 in cars:
-            cars[17].track_m = wrap(config.SCENE_CAR17_AT_M, lap)
-            cars[17].speed_mps = self.sim.v_allow(cars[17].track_m)
-        log.info("scene %d: car 21 at %.0f m, car 17 at %.0f m", n,
-                 cars[21].track_m if 21 in cars else -1, cars[17].track_m if 17 in cars else -1)
+        if 17 not in cars or 21 not in cars:
+            return
+        dt = 1.0 / config.SERVER_TICK_HZ
+        s = cars[17].track_m
+        for _ in range(int(config.SCENE_CAR21_BEHIND_S / dt)):   # drive backwards along the speed profile
+            s = wrap(s - self.sim.v_allow(s) * dt, self.sim.lap)
+        cars[21].track_m = s
+        cars[21].speed_mps = self.sim.v_allow(s)
+        log.info("scene %d: car 17 at %.0f m, car 21 %.0f s behind at %.0f m", n,
+                 cars[17].track_m, config.SCENE_CAR21_BEHIND_S, s)
 
     # ------------------------------------------------------------ main tick
     def tick(self, dt: float, connected: set[int], now_s: Optional[float] = None,

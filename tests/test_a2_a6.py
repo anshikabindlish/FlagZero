@@ -101,13 +101,15 @@ def run_ticks(e, seconds, t0_ms, now0):
 def test_scene1_debris_warns_car21(eng):
     e = eng
     e.on_dash({"type": "scene", "n": 1}, PHONES)
+    debris_m = (e.world.cars[21].track_m + 600) % e.sim.lap
     e.on_vision({"type": "vision", "cars": [], "hazards": [
-        {"kind": "DEBRIS", "track_m": 1423, "conf": 0.9}]}, t_ms=1000, now_s=1.0)
+        {"kind": "DEBRIS", "track_m": debris_m, "conf": 0.9}]}, t_ms=1000, now_s=1.0)
     inc = e.world.incidents[0]
-    assert inc.kind == "DEBRIS" and inc.corner == "T4" and inc.severity == 2
+    corner = e.sim.track.nearest_corner(debris_m).name
+    assert inc.kind == "DEBRIS" and inc.corner == corner and inc.severity == 2
     out = run_ticks(e, 3, 1000, 1.0)
     warn21 = [m for c, m in out if c == 21 and m["type"] == "warning"]
-    assert warn21 and warn21[0]["level"] >= router.CAUTION and warn21[0]["corner"] == "T4"
+    assert warn21 and warn21[0]["level"] >= router.CAUTION and warn21[0]["corner"] == corner
     dists = [m["dist_m"] for m in warn21 if m["dist_m"] is not None]
     assert dists[-1] < dists[0]                       # counts down live
     assert all(m["level"] <= router.YELLOW for m in warn21)   # debris maxes out at YELLOW
@@ -121,19 +123,20 @@ def test_scene1_debris_warns_car21(eng):
 def test_scene2_full_escalation(eng):
     e = eng
     e.on_dash({"type": "scene", "n": 2}, PHONES)
-    e.on_vision({"type": "vision", "cars": [{"car": 17, "track_m": 1423.0}], "hazards": []},
+    p17 = round(e.world.cars[17].track_m, 1)            # the camera sees car 17 where it is
+    e.on_vision({"type": "vision", "cars": [{"car": 17, "track_m": p17}], "hazards": []},
                 t_ms=1000, now_s=1.0)
     out = e.on_car(17, {"type": "imu_event", "cls": "IMPACT", "peak_g": 5.2, "conf": 0.88}, t_ms=1100)
     assert out == [(17, {"type": "countdown", "secs": 15, "peak_g": 5.2})]
     inc = e.world.incidents[0]
-    assert inc.severity == 2 and inc.track_m == pytest.approx(1423, abs=1)
+    assert inc.severity == 2 and inc.track_m == pytest.approx(p17, abs=1)
     assert e.world.cars[17].state == "STOPPED"
 
     e.on_car(17, {"type": "imu_update", "still": True}, t_ms=2600)
     assert inc.severity == 3
 
-    e.on_vision({"type": "vision", "cars": [{"car": 17, "track_m": 1423.0}], "hazards": [
-        {"kind": "STOPPED_VEHICLE", "car": 17, "track_m": 1423, "conf": 0.93}]}, t_ms=3200, now_s=3.2)
+    e.on_vision({"type": "vision", "cars": [{"car": 17, "track_m": p17}], "hazards": [
+        {"kind": "STOPPED_VEHICLE", "car": 17, "track_m": p17, "conf": 0.93}]}, t_ms=3200, now_s=3.2)
     assert len(e.world.incidents) == 1                  # same car -> same incident
     assert inc.fused_conf == pytest.approx(0.9916)
 

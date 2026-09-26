@@ -165,10 +165,9 @@ def main() -> None:
         sim.run_headless(1.0)
         _print_table(sim)
     print(f"simulated {args.seconds:.0f} s of racing in {time.perf_counter() - t0:.3f} s")
-    t4 = sim.track.corner("T4")
-    car21 = sim.world.cars[21]
-    d = upstream_distance(car21.track_m, t4.s, sim.lap)
-    print(f"car 21 is at {car21.track_m:.0f} m, {d:.0f} m before T4, doing {car21.speed_kmh:.0f} km/h")
+    car17, car21 = sim.world.cars[17], sim.world.cars[21]
+    d = upstream_distance(car21.track_m, car17.track_m, sim.lap)
+    print(f"car 21 is at {car21.track_m:.0f} m, {d:.0f} m behind car 17, doing {car21.speed_kmh:.0f} km/h")
 
 
 if __name__ == "__main__":
