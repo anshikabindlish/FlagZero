@@ -14,6 +14,7 @@ Options:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -50,6 +51,32 @@ def find_cloudflared() -> str | None:
         Path("/usr/local/bin/cloudflared"),
     ]
     return next((str(p) for p in candidates if p.is_file()), None)
+
+
+def dns_ready(host: str) -> bool:
+    """True once public DNS (Cloudflare AND Google) can resolve the new tunnel name.
+
+    Asked over DNS-over-HTTPS on purpose: querying the PC's or the Wi-Fi's own resolver too
+    early makes them cache "does not exist" (DNS_PROBE_FINISHED_NXDOMAIN) for a while."""
+    for url in (f"https://1.1.1.1/dns-query?name={host}&type=A", f"https://8.8.8.8/resolve?name={host}&type=A"):
+        try:
+            req = urllib.request.Request(url, headers={"accept": "application/dns-json"})
+            data = json.loads(urllib.request.urlopen(req, timeout=4).read())
+            if data.get("Status") != 0 or not any(a.get("type") == 1 for a in data.get("Answer", [])):
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def wait_for_dns(host: str, timeout_s: float = 90) -> bool:
+    end = time.time() + timeout_s
+    while time.time() < end:
+        if dns_ready(host):
+            time.sleep(3)                       # let the Wi-Fi's resolver catch up too
+            return True
+        time.sleep(2)
+    return False
 
 
 def wait_for_server(timeout_s: float = 30) -> bool:
@@ -122,26 +149,33 @@ def main() -> None:
             if not found.wait(45):
                 print("Couldn't get a tunnel address (no internet?). The server still runs locally.")
 
+    local_join = f"http://localhost:{PORT}/join"
     if tunnel_url:
         (config.RESULTS_DIR).mkdir(parents=True, exist_ok=True)
         (config.RESULTS_DIR / "tunnel_url.txt").write_text(tunnel_url + "\n")
-        banner(["FLAGZERO IS RUNNING",
+        local_join += f"?base={tunnel_url}"
+        print(f"Tunnel created: {tunnel_url}\nWaiting for it to go live on the internet (usually 10-40 s) ...", flush=True)
+        live = wait_for_dns(tunnel_url.removeprefix("https://"))
+        banner(["FLAGZERO IS RUNNING" + ("" if live else "  (couldn't confirm the tunnel is live)"),
                 "",
                 f"Dashboard (this laptop):  {local_dash}",
-                f"Join page (QR codes):     {tunnel_url}/join",
+                f"Join page / QR codes:     {local_join}",
                 f"Car 17 (iPhone):          {tunnel_url}/car?car=17",
                 f"Car 21 (OnePlus):         {tunnel_url}/car?car=21",
                 "",
+                "READY: scan the QR codes now." if live else "Wait ~30 s, then scan the QR codes.",
+                "If a phone says 'site can't be reached', wait 1 minute and reload (DNS catch-up).",
                 "Leave this window open. Press Ctrl+C here to stop everything."])
     else:
         banner(["FLAGZERO SERVER IS RUNNING (no tunnel)", "", f"Dashboard: {local_dash}",
                 "Press Ctrl+C here to stop."])
 
     if not args.no_browser:
+        # The laptop opens both pages via localhost, so it never has to look up the tunnel name;
+        # the join page's QR codes still point the phones at the tunnel (?base=...).
         webbrowser.open(local_dash)
         if tunnel_url:
-            time.sleep(4)                           # a brand-new tunnel needs a few seconds before it resolves
-            webbrowser.open(f"{tunnel_url}/join")
+            webbrowser.open(local_join)
 
     try:
         while all(p.poll() is None for p in procs):

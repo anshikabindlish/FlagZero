@@ -35,15 +35,19 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
-    // Built from this page's own address, so the QR codes always match the current tunnel URL.
-    const origin = location.origin;
+    // QR codes point at the tunnel. The launcher opens this page on the laptop as
+    // http://localhost:8000/join?base=https://<tunnel> (no DNS lookup needed on the laptop);
+    // opened through the tunnel itself, the page's own address is used.
+    let origin = location.origin;
+    const base = new URLSearchParams(location.search).get("base");
+    if (base) { try { const u = new URL(base); if (u.protocol === "https:") origin = u.origin; } catch (e) { /* ignore a bad base */ } }
     const targets = [
       { title: "Car #17", role: "Crash car · iPhone", url: `${origin}/car?car=17` },
       { title: "Car #21", role: "Approaching car · OnePlus", url: `${origin}/car?car=21` },
       { title: "Dashboard", role: "Race control · any screen", url: `${origin}/dashboard` },
     ];
-    const local = /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(location.hostname);
-    if (local || location.protocol !== "https:") {
+    const local = /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(new URL(origin).hostname);
+    if (local || !origin.startsWith("https:")) {
       document.getElementById("warn").innerHTML = `<div class="warn"><b>Phones can't use this address.</b>
         You opened the join page via <code>${location.host}</code>. Open it through the tunnel's
         <code>https://….trycloudflare.com/join</code> address instead (the launcher prints it), so the QR codes point
