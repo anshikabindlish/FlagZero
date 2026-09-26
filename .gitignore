@@ -1,9 +1,53 @@
+# ── Python ──────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.Python
+build/
+dist/
 .venv/
 venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── macOS ───────────────────────────────────────────────
 .DS_Store
-node_modules/
-build/
-*.hex
-.vscode/
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ── Windows ─────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ── VS Code ─────────────────────────────────────────────
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.code-workspace
+
+# ── FlagZero project-specific ───────────────────────────
+# Captured stills / calibration frames / recorded clips
+flagzero/vision/frames/*
+!flagzero/vision/frames/.gitkeep
+*.mp4
+*.mov
+*.avi
+
+# Local env / secrets (cloudflared tokens, API keys, etc.)
+.env
+.env.*
+*.pem
+
+# Logs and run artifacts
+*.log
+flagzero/logs/
