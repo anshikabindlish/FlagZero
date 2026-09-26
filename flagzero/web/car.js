@@ -158,7 +158,9 @@ function showLevel(level, corner, distM, etaS) {
 }
 
 // ---- "I'm OK" countdown and driver actions ----------------------------------
-// Overlay modes: null | "countdown" | "ok" | "red" (driver asked for red) | "timeout"
+// Drivers can escalate (I'm OK, recommend red) and inform (report a false alarm), but they can
+// never return a flag to green: only race control's dashboard Reset does that (a "reset" message).
+// Overlay modes: null | "countdown" | "ok" | "reported" (false alarm reported) | "red" (driver asked for red) | "timeout"
 let cdTimer = null, cdLeft = 0, overlayMode = null;
 
 function setOverlay(mode) {
@@ -174,14 +176,11 @@ function setOverlay(mode) {
 function refreshButtons() {
   const m = overlayMode;
   const underRed = currentLevel === 5;
-  const falseAlarmAllowed = m === "ok" && !underRed; // only for yellows, never to undo a red
   $("okBtn").classList.toggle("hidden", m !== "countdown");
-  $("falseBtn").classList.toggle("hidden", !falseAlarmAllowed);
-  $("redBtn").classList.toggle("hidden", !(m === "countdown" || (m === "ok" && !underRed)));
-  $("continueBtn").classList.toggle("hidden", !(m === "ok" || m === "red"));
-  $("continueBtn").textContent = m === "red" ? "BACK TO DASH" : "CONTINUE UNDER YELLOW";
-  const somethingOut = currentLevel > 0 || m !== null;
-  $("greenBtn").classList.toggle("hidden", !somethingOut || m === "countdown" || falseAlarmAllowed);
+  $("falseBtn").classList.toggle("hidden", !(m === "ok" && !underRed));
+  $("redBtn").classList.toggle("hidden", !(m === "countdown" || ((m === "ok" || m === "reported") && !underRed)));
+  // after asking for red, or with no response, the screen stays up until race control resets
+  $("continueBtn").classList.toggle("hidden", !(m === "ok" || m === "reported"));
 }
 
 function startCountdown(seconds, peakG, local) {
@@ -238,17 +237,17 @@ function driverRequestsRed() {
   beepPattern(2, 600);
 }
 
-function driverFalseAlarm() {
+function driverReportsFalseAlarm() {
+  // Only a report: race control sees it on the dashboard and decides whether to clear the flags.
   sendImportant({ type: "driver_request", request: "FALSE_ALARM" });
-  resetLocal();
+  $("cdTitle").textContent = "FALSE ALARM REPORTED";
+  $("cdInfo").textContent = "";
+  $("cdResult").textContent = "Race control decides · flags stay out until they clear them";
+  setOverlay("reported");
+  beep(700, 100);
 }
 
-function raceControlGreen() {
-  sendImportant({ type: "green_flag" });
-  resetLocal(); // also works locally if the link is down
-}
-
-function resetLocal() {
+function resetLocal() {   // only on race control's "reset"
   clearInterval(cdTimer);
   medicalStatus = null;
   setOverlay(null);
@@ -257,9 +256,8 @@ function resetLocal() {
 
 $("okBtn").addEventListener("click", () => { if (overlayMode === "countdown" && cdLeft > 0) driverOk(); });
 $("redBtn").addEventListener("click", driverRequestsRed);
-$("falseBtn").addEventListener("click", driverFalseAlarm);
+$("falseBtn").addEventListener("click", driverReportsFalseAlarm);
 $("continueBtn").addEventListener("click", () => setOverlay(null));
-$("greenBtn").addEventListener("click", raceControlGreen);
 
 // ---- crash detection --------------------------------------------------------
 // IDLE -> CAPTURE (300 ms, record features) -> classify + send imu_event

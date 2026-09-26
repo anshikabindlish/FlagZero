@@ -10,7 +10,11 @@
 > - **Monte Carlo following gap:** `MC_GAP_S` went from (0.8, 3.0) to (1.0, 10.0). With 0.8–3 s only, the next car is already inside its stopping distance in ~94% of runs, so no warning system can help and both columns read ~93%. 1–10 s is a realistic spread for 20 cars on a ~80 s lap: secondary impacts 55% → 26%. The dashboard also shows results per gap band, so the 'too close for any system' band stays visible and honest.
 > - C5 is done: the dashboard proof panel (timeline, sliders → `/api/montecarlo`, results table with `/api/montecarlo/last` fallback, per-gap-band chart), `web/join.html` (QR codes from `location.origin`), and `start_demo.bat` / `start_demo.command` → `tools/start_demo.py` (server + tunnel, prints and opens the URLs).
 > - **Per-incident counterfactual:** when an incident is detected, `Engine` freezes who was approaching (car, distance, speed) on the next tick (`incident_snapshot()`), and records this incident's measured detect→warn time when the first warning is acked. `GET /api/montecarlo/incident?id=` replays each of those cars with `montecarlo.incident()` (same marshal model and braking physics as `run()`), marshal vs FlagZero, and the dashboard shows it at the top of the proof panel.
-> - New tests: `tests/test_c_phone_extras.py`. All 61 tests pass.
+> - **Only race control returns a flag to green.** Drivers can escalate (I'm OK, recommend red) and inform, but never clear:
+>   - The phones no longer have a green-flag button, and the server ignores `green_flag` from phones (logged).
+>   - `driver_request FALSE_ALARM` is now only a REPORT: it adds a `DRIVER`/`FALSE_ALARM` source (no confidence, no severity change), and the dashboard shows "Driver says: reports a false alarm · press RESET to clear if you agree".
+>   - Only the dashboard's `reset` (or `scene`) clears incidents.
+> - New tests: `tests/test_c_phone_extras.py`. All 62 tests pass.
 >
 > The page paths are `/car.js` and `/dashboard.js` (server.py serves `/<name>.js` from `web/`), and the dashboard reads `state_message.md` fields directly. Section 1 and parts of section 5 below describe the earlier stand-in server and are kept for reference.
 

@@ -43,29 +43,38 @@ def test_driver_recommends_red_needs_confirm(eng):
     assert eng.world.red_confirmed and not eng.world.red_auto
 
 
-def test_false_alarm_clears_yellows(eng):
+def test_false_alarm_is_only_a_report(eng):
     crash(eng)
     eng.on_car(17, {"type": "ok_pressed"}, 2000)
+    sev = eng.world.incidents[0].severity
     out = eng.on_car(17, {"type": "driver_request", "request": "FALSE_ALARM"}, 3000)
-    assert not eng.world.incidents
-    assert {c for c, m in out if m["type"] == "reset"} == PHONES
+    inc = eng.world.incidents[0]                                   # still out: race control decides
+    assert not any(m["type"] == "reset" for _, m in out)
+    assert any(s["src"] == "DRIVER" and s["kind"] == "FALSE_ALARM" for s in inc.sources)
+    assert inc.severity == sev and inc.fused_conf == pytest.approx(0.85)   # a report adds no confidence
+    out = eng.on_dash({"type": "reset"}, PHONES)                   # race control agrees -> green
+    assert not eng.world.incidents and {c for c, m in out if m["type"] == "reset"} == PHONES
 
 
-def test_false_alarm_ignored_once_red(eng):
+def test_false_alarm_report_under_red_changes_nothing(eng):
     crash(eng)
     eng.on_car(17, {"type": "countdown_result", "result": "TIMEOUT"}, 16000)
     assert eng.world.red_confirmed and eng.world.red_auto             # no OK -> automatic red
     out = eng.on_car(17, {"type": "driver_request", "request": "FALSE_ALARM"}, 17000)
-    assert eng.world.incidents and not any(m["type"] == "reset" for _, m in out)
+    assert eng.world.incidents and eng.world.red_confirmed and not any(m["type"] == "reset" for _, m in out)
 
 
-def test_green_flag_resets_everything(eng):
+@pytest.mark.parametrize("red", [False, True])
+def test_phone_green_flag_is_ignored(eng, red):
     crash(eng)
-    eng.on_car(17, {"type": "countdown_result", "result": "TIMEOUT"}, 16000)
-    out = eng.on_car(21, {"type": "green_flag"}, 17000)
-    w = eng.world
-    assert not w.incidents and not w.red_confirmed and not w.red_pending
-    assert {c for c, m in out if m["type"] == "reset"} == PHONES
+    if red:
+        eng.on_car(17, {"type": "countdown_result", "result": "TIMEOUT"}, 16000)
+    for car in (17, 21):                                          # neither the crashed nor another driver
+        out = eng.on_car(car, {"type": "green_flag"}, 17000)
+        assert not any(m["type"] == "reset" for _, m in out)
+    assert eng.world.incidents and eng.world.red_confirmed == red
+    eng.on_dash({"type": "reset"}, PHONES)                        # only race control clears
+    assert not eng.world.incidents and not eng.world.red_confirmed
 
 
 def test_scene_puts_car21_about_9s_behind_car17(eng):

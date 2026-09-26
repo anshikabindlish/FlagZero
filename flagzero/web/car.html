@@ -46,12 +46,10 @@
   #cdButtons button { font-size: 1.3rem; font-weight: 800; padding: 1rem; border-radius: .9rem; border: 3px solid #fff; color: #fff; }
   #cdButtons .big { font-size: 2rem; padding: 1.3rem 1rem; }
   #okBtn { background: #fff; color: #b00020 !important; border-color: #fff; }
-  #falseBtn { background: #0b7a2a; }
+  #falseBtn { background: #37474f; }
   #redBtn { background: #d50000; }
   #continueBtn { background: transparent; font-size: 1rem !important; border-width: 2px !important; opacity: .85; }
 
-  #greenBtn { position: fixed; bottom: 56px; left: 12px; z-index: 10; background: #0b7a2a; color: #fff;
-    border: 2px solid #fff; padding: .6rem .9rem; border-radius: .5rem; font-weight: 800; font-size: .95rem; }
 </style>
 </head>
 <body>
@@ -79,13 +77,11 @@
     <div id="cdResult"></div>
     <div id="cdButtons">
       <button id="okBtn" class="big">I'M OK</button>
-      <button id="falseBtn" class="big">FALSE ALARM · GREEN FLAG</button>
+      <button id="falseBtn">REPORT FALSE ALARM</button>
       <button id="redBtn">RECOMMEND RED FLAG</button>
       <button id="continueBtn">CONTINUE UNDER YELLOW</button>
     </div>
   </div>
-
-  <button id="greenBtn" class="hidden">RACE CONTROL · GREEN FLAG</button>
 
   <script src="/car.js"></script>
 </body>

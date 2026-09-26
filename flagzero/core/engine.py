@@ -86,13 +86,13 @@ class Engine:
                 self._resume_if_ok(car)
         elif kind == "driver_request":                 # docs/phone_changes.md
             res = incidents.handle_driver_request(self.world, msg, t_ms)
-            if res == "clear":
-                log.info("car %s: false alarm -> green flag", car)
-                out += self.reset(set(self.world.car_sockets) | {car})
-            elif res == "red":
+            if res == "red":
                 self.sim.stop_car(car)                 # driver wants red: they stay where they are
-        elif kind == "green_flag":                     # phone's race-control button = dashboard reset
-            out += self.reset(set(self.world.car_sockets) | {car})
+            elif res == "false_alarm_reported":
+                log.info("car %s reports a false alarm; flags stay until race control resets", car)
+        elif kind == "green_flag":
+            # Only race control (dashboard Reset) can return a flag to green; drivers can't.
+            log.warning("car %s sent green_flag: ignored, only race control can clear flags", car)
         if kind not in ("tel", "ack"):
             log.info("car %s -> %s", car, msg)
         severity.update(self.world)

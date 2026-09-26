@@ -189,6 +189,9 @@ function renderIncident(s, inc, count) {
     return `<span class="chip ${esc(name)}">${esc(String(name).replace("_", "-"))}${detail ? " · " + esc(detail) : ""}</span>`;
   }).join("");
   const label = inc.corner_label || cornerLabel(inc.corner);
+  const said = (inc.sources || []).filter((x) => typeof x === "object" && x.src === "DRIVER").map((x) => x.kind);
+  const driverSays = said.includes("RED_FLAG") ? `<span class="med-URGENT">RECOMMENDS RED FLAG</span>`
+    : said.includes("FALSE_ALARM") ? `<span class="med-MONITOR">REPORTS A FALSE ALARM · press RESET to clear if you agree</span>` : "";
   const med = inc.medical ? `<span class="med-${esc(inc.medical)}">${esc(inc.medical)}</span>` : "—";
   const age = inc.created_ms ? `${Math.max(0, (Date.now() - inc.created_ms) / 1000).toFixed(0)} s ago` : "";
   $("incidentBody").innerHTML = `
@@ -200,6 +203,7 @@ function renderIncident(s, inc, count) {
       <span class="k">Sources</span><span>${chips || "—"}</span>
       <span class="k">Vehicle</span><span>${inc.car != null ? "#" + esc(inc.car) : "—"}</span>
       <span class="k">Medical</span><span>${med}</span>
+      ${driverSays ? `<span class="k">Driver says</span><span>${driverSays}</span>` : ""}
       <span class="k">Detected</span><span>${age}</span>
     </div>
     ${count > 1 ? `<div class="others">+ ${count - 1} more active incident(s)</div>` : ""}`;
