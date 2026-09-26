@@ -129,6 +129,9 @@ class Simulation:
             # car (pace > 1) follows a scaled profile, which needs pace^2 x the braking.
             ahead = c.track_m + c.speed_mps * dt
             target = self.v_allow(ahead) * c.pace
+            cap = config.SPEED_CAP_KMH.get(c.warning)     # cars obey SLOW ZONE / RED
+            if cap is not None:
+                target = min(target, kmh(cap))
             if c.speed_mps > target:
                 c.speed_mps = max(target, c.speed_mps - self.a_brake * c.pace ** 2 * dt)
             else:

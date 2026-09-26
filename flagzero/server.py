@@ -4,8 +4,9 @@ Run from the repo root:
     python3 -m uvicorn flagzero.server:app --host 0.0.0.0 --port 8000 --reload
 
 One process. Phones connect to /ws/car?car=N, the camera to /ws/vision,
-dashboards to /ws/dash. A 20 Hz loop advances the simulation and broadcasts a
-"state" message to every dashboard at 10 Hz.
+dashboards to /ws/dash. A 20 Hz loop runs the engine (sim, severity, router,
+medical) and broadcasts a "state" message to every dashboard at 10 Hz.
+All the logic lives in core/engine.py; this file only moves messages.
 """
 from __future__ import annotations
 
@@ -20,16 +21,15 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from flagzero import config
-from flagzero.core.state import WorldState, now_ms
-from flagzero.sim.sim import Simulation
+from flagzero.core.engine import Engine
+from flagzero.core.state import now_ms
+from flagzero.sim import montecarlo
 
 log = logging.getLogger("flagzero")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-world = WorldState()
-sim = Simulation(world)
-_ping_id = 0
-_pings_sent: dict[int, tuple[int, int]] = {}   # ping id -> (car, sent_ms)
+engine = Engine()
+world = engine.world
 
 
 # ---------------------------------------------------------------- helpers
@@ -42,17 +42,20 @@ async def send_json(ws: WebSocket, msg: dict) -> bool:
 
 
 async def broadcast_dash(msg: dict) -> None:
-    dead = []
-    for ws in list(world.dash_sockets):
-        if not await send_json(ws, msg):
-            dead.append(ws)
+    dead = [ws for ws in list(world.dash_sockets) if not await send_json(ws, msg)]
     for ws in dead:
         world.dash_sockets.discard(ws)
 
 
-async def send_to_car(car: int, msg: dict) -> bool:
-    ws = world.car_sockets.get(car)
-    return bool(ws) and await send_json(ws, msg)
+async def send_out(out: list[tuple[int, dict]]) -> None:
+    for car, msg in out:
+        ws = world.car_sockets.get(car)
+        if ws is not None:
+            await send_json(ws, msg)
+
+
+def connected() -> set[int]:
+    return set(world.car_sockets)
 
 
 # ---------------------------------------------------------------- main loop
@@ -62,22 +65,17 @@ async def main_loop() -> None:
     tick = 0
     next_t = time.monotonic()
     last_ping = 0.0
-    global _ping_id
     while True:
-        now = time.monotonic()
-        sim.tick(dt, now_s=now)
-        # later: router.update(world), severity.update(world) go here (A2, A3)
-        if tick % every == 0:
-            await broadcast_dash(world.state_message())
-        if now - last_ping >= config.PHONE_PING_INTERVAL_S:
-            last_ping = now
-            for car in list(world.car_sockets):
-                _ping_id += 1
-                _pings_sent[_ping_id] = (car, now_ms())
-                await send_to_car(car, {"type": "ping", "id": _ping_id})
-            if len(_pings_sent) > 500:
-                for k in sorted(_pings_sent)[:250]:
-                    _pings_sent.pop(k, None)
+        try:
+            now = time.monotonic()
+            await send_out(engine.tick(dt, connected(), now_s=now))
+            if tick % every == 0:
+                await broadcast_dash(world.state_message())
+            if now - last_ping >= config.PHONE_PING_INTERVAL_S:
+                last_ping = now
+                await send_out(engine.pings(connected()))
+        except Exception:
+            log.exception("main loop error (continuing)")
         tick += 1
         next_t += dt
         await asyncio.sleep(max(0.0, next_t - time.monotonic()))
@@ -86,7 +84,7 @@ async def main_loop() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     task = asyncio.create_task(main_loop())
-    log.info("sim loop started: %d cars, %d Hz", len(world.cars), config.SERVER_TICK_HZ)
+    log.info("engine started: %d cars, %d Hz", len(world.cars), config.SERVER_TICK_HZ)
     yield
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
@@ -113,7 +111,9 @@ def index() -> HTMLResponse:
         "<li><a href='/car?car=17'>/car?car=17</a></li>"
         "<li><a href='/car?car=21'>/car?car=21</a></li>"
         "<li><a href='/api/state'>/api/state</a> (live JSON)</li>"
-        "<li><a href='/api/track'>/api/track</a></li></ul>"
+        "<li><a href='/api/track'>/api/track</a></li>"
+        "<li><a href='/api/montecarlo?n=10000&seed=42'>/api/montecarlo</a></li>"
+        "<li><a href='/api/latency'>/api/latency</a></li></ul>"
     )
 
 
@@ -132,6 +132,7 @@ def join_page() -> Response:
     return _page("join.html", "Join")
 
 
+# ---------------------------------------------------------------- APIs
 @app.get("/api/track")
 def api_track() -> FileResponse:
     return FileResponse(config.TRACK_FILE)
@@ -140,6 +141,38 @@ def api_track() -> FileResponse:
 @app.get("/api/state")
 def api_state() -> JSONResponse:
     return JSONResponse(world.state_message())
+
+
+@app.get("/api/montecarlo")
+def api_montecarlo(n: int = config.MC_N, seed: int | None = None,
+                   visibility: float | None = None,
+                   marshal_react_min: float | None = None, marshal_react_max: float | None = None,
+                   speed_min: float | None = None, speed_max: float | None = None,
+                   sightline_min: float | None = None, sightline_max: float | None = None,
+                   gap_min: float | None = None, gap_max: float | None = None) -> JSONResponse:
+    """Re-run the Monte Carlo with the dashboard's slider values."""
+    res = montecarlo.run(n, seed, visibility=visibility,
+                         marshal_react_min=marshal_react_min, marshal_react_max=marshal_react_max,
+                         speed_min=speed_min, speed_max=speed_max,
+                         sightline_min=sightline_min, sightline_max=sightline_max,
+                         gap_min=gap_min, gap_max=gap_max)
+    montecarlo.save(res)
+    return JSONResponse(res)
+
+
+@app.get("/api/montecarlo/last")
+def api_montecarlo_last() -> Response:
+    """Static fallback for the never-cut results table."""
+    f = config.RESULTS_DIR / "montecarlo.json"
+    return FileResponse(f) if f.exists() else JSONResponse({"error": "no saved run yet"}, status_code=404)
+
+
+@app.get("/api/latency")
+def api_latency() -> JSONResponse:
+    from flagzero.core import latency
+    return JSONResponse({"live": world.latency,
+                         "detect_to_ack_ms": latency.stats("detect_to_ack_ms"),
+                         "detect_to_sent_ms": latency.stats("detect_to_sent_ms")})
 
 
 @app.get("/{name}.{ext}")
@@ -154,6 +187,16 @@ def web_asset(name: str, ext: str) -> Response:
 
 
 # ---------------------------------------------------------------- websockets
+async def _read_json(ws: WebSocket) -> tuple[dict | None, int]:
+    raw = await ws.receive_text()
+    t = now_ms()                      # stamp receive time before parsing
+    try:
+        msg = json.loads(raw)
+        return (msg if isinstance(msg, dict) else None), t
+    except json.JSONDecodeError:
+        return None, t
+
+
 @app.websocket("/ws/car")
 async def ws_car(ws: WebSocket) -> None:
     await ws.accept()
@@ -165,23 +208,9 @@ async def ws_car(ws: WebSocket) -> None:
     log.info("phone connected: car %s", car)
     try:
         while True:
-            raw = await ws.receive_text()
-            recv_ms = now_ms()
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            msg["_recv_ms"] = recv_ms
-            kind = msg.get("type")
-            if kind == "ack" and msg.get("id") in _pings_sent:
-                pcar, sent = _pings_sent.pop(msg["id"])
-                world.latency[f"rtt_car{pcar}_ms"] = recv_ms - sent
-            elif kind == "tel":
-                world.latency.setdefault("tel", {})[str(car)] = {
-                    "g": msg.get("g"), "gyro": msg.get("gyro"), "ms": recv_ms}
-            else:
-                log.info("car %s -> %s", car, msg)
-                # later: incidents.handle_car_message(world, sim, msg) (A3)
+            msg, t = await _read_json(ws)
+            if msg is not None:
+                await send_out(engine.on_car(car, msg, t))
     except WebSocketDisconnect:
         pass
     finally:
@@ -197,20 +226,9 @@ async def ws_vision(ws: WebSocket) -> None:
     log.info("vision connected")
     try:
         while True:
-            raw = await ws.receive_text()
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            msg["_recv_ms"] = now_ms()
-            if msg.get("type") != "vision":
-                continue
-            now = time.monotonic()
-            for c in msg.get("cars", []):
-                if "car" in c and "track_m" in c:
-                    sim.apply_camera(int(c["car"]), float(c["track_m"]), now_s=now)
-            world.last_vision = msg
-            # later: incidents.handle_vision_hazards(world, sim, msg["hazards"]) (A3)
+            msg, t = await _read_json(ws)
+            if msg is not None and msg.get("type") == "vision":
+                engine.on_vision(msg, t, time.monotonic())
     except WebSocketDisconnect:
         pass
     finally:
@@ -226,25 +244,9 @@ async def ws_dash(ws: WebSocket) -> None:
     await send_json(ws, world.state_message())
     try:
         while True:
-            raw = await ws.receive_text()
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            kind = msg.get("type")
-            log.info("dashboard -> %s", msg)
-            if kind == "reset":
-                world.incidents.clear()
-                world.red_pending = world.red_confirmed = False
-                sim.release_all()
-                for c in world.cars.values():
-                    c.warning = 0
-                for car in list(world.car_sockets):
-                    await send_to_car(car, {"type": "reset"})
-            elif kind == "confirm_red":
-                world.red_confirmed = True     # A4 sends RED to the phones
-            elif kind == "scene":
-                pass                           # A4 pre-positions cars per scene
+            msg, _ = await _read_json(ws)
+            if msg is not None:
+                await send_out(engine.on_dash(msg, connected()))
     except WebSocketDisconnect:
         pass
     finally:

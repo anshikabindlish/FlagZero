@@ -40,12 +40,54 @@ ROUTER_RESEND_S = 0.25
 ASSOC_MAX_DIST_M = 50.0
 ASSOC_MAX_DT_S = 5.0
 LOW_CONF = 0.6
+IMPACT_STRONG_G = 8.0            # IMPACT at or above this peak g counts as "strong"
+STOPPING_CLASSES = ("IMPACT", "SEVERE", "ROLLOVER")   # these stop the car + start the countdown
+
+# ---------------------------------------------------------------- warnings
+WARNING_LABELS = {0: "NORMAL", 1: "CAUTION", 2: "YELLOW", 3: "DBL YELLOW", 4: "SLOW ZONE", 5: "RED"}
+SEVERITY_LABELS = {0: "NORMAL", 1: "CAUTION", 2: "YELLOW", 3: "DOUBLE_YELLOW", 4: "RED_FLAG_RECOMMENDED"}
+SEVERITY_MAX_WARNING = {1: 1, 2: 2, 3: 3, 4: 4}   # sev 3 -> DBL YELLOW, sev 4 -> SLOW ZONE
+SPEED_CAP_KMH = {4: 80.0, 5: 60.0}                 # sim cars obey SLOW ZONE and RED
 
 # ---------------------------------------------------------------- medical (A4)
 COUNTDOWN_S = 10
+COUNTDOWN_SERVER_GRACE_S = 3     # server declares TIMEOUT itself if the phone never answers
 HR_REST = (70, 80)
 HR_IMPACT = (135, 145)
 HR_RAMP_S = 5.0
 SPO2 = (96, 98)
+
+# ---------------------------------------------------------------- demo scenes (A4)
+SCENE_CAR21_BEFORE_T4_M = 700.0  # car 21 starts this far before T4 (~15 s away)
+SCENE_CAR17_AT_M = 1300.0        # car 17 waits just before the paper track
+
+# ---------------------------------------------------------------- marshal baseline (A4/A5)
+MARSHAL_SEE_VISIBLE_S = (0.2, 1.0)   # post can see the spot
+MARSHAL_SEE_BLIND_S = (3.0, 8.0)     # blind crest: relies on radio / another post
+MARSHAL_VISIBILITY = 0.5             # chance the nearest post can see the incident
+MARSHAL_REACT_S = (0.8, 2.5)
+MARSHAL_FLAG_S = (0.5, 1.5)
+
+# ---------------------------------------------------------------- Monte Carlo (A5)
+MC_N = 10_000
+MC_GAP_S = (0.8, 3.0)
+MC_SPEED_KMH = (150.0, 250.0)
+MC_SIGHTLINE_M = (50.0, 250.0)
+MC_BRAKE_G = (1.0, 1.5)
+MC_DRIVER_REACT_S = (0.7, 1.5)
+MC_IMU_DETECT_S = 0.3
+MC_CAMERA_DETECT_S = (0.5, 1.0)
+MC_NETWORK_S = (0.05, 0.3)
+MC_IMU_FALSE_NEG = 0.10          # replace with the tuning-session numbers (spec §11)
+MC_CAMERA_FALSE_NEG = 0.05       # replace with the vision-metrics numbers
+MC_CAMERA_COVERAGE = 0.8         # share of incidents inside a camera's view
+# false yellows/hour: PLACEHOLDERS until the tuning session measures real rates
+MC_IMU_FALSE_EVENTS_PER_CAR_HOUR = 0.2
+MC_CAMERA_FALSE_EVENTS_PER_HOUR = 0.5
+MC_FIELD_CARS = 20
+MC_SINGLE_SOURCE_YELLOW_SHARE = 0.3   # share of false single-source events that reach YELLOW (rest capped at CAUTION)
+
+# ---------------------------------------------------------------- latency (A6)
+RESULTS_DIR = PACKAGE_DIR.parent / "results"
 
 G = 9.81
