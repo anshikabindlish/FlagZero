@@ -27,11 +27,7 @@ const CFG = {
 
 const params = new URLSearchParams(location.search);
 const CAR_ID = parseInt(params.get("car") || "17", 10);
-// ?wheel=1: the steering-wheel display. No motion sensing; it connects next to the car's phone
-// and the wheel's physical buttons (tools/wheel.py) drive it.
-const WHEEL = params.get("wheel") === "1";
-const WS_URL = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/car?car=" + CAR_ID
-  + (WHEEL ? "&role=wheel" : "");
+const WS_URL = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/car?car=" + CAR_ID;
 const G = 9.81;
 
 // Warning levels 0-5 (v2): NORMAL, CAUTION, YELLOW, DBL YELLOW, SLOW ZONE, RED
@@ -125,27 +121,12 @@ function handleMessage(m) {
       break;
     case "medical":
       medicalStatus = m.status;
-      // still counting down here: the driver answered on the other screen (phone or steering wheel)
-      if (overlayMode === "countdown") (m.status === "URGENT" ? showTimeout : showOk)();
-      else if (overlayMode) $("cdResult").textContent = medicalLine();
-      break;
-    case "wheel_button":
-      wheelButton(m.button);
+      if (overlayMode && overlayMode !== "countdown") $("cdResult").textContent = medicalLine();
       break;
     case "reset":
       resetLocal();
       break;
   }
-}
-
-// A physical steering-wheel button acts exactly like tapping the same button here.
-function wheelButton(b) {
-  const shown = (id) => !$(id).classList.contains("hidden");
-  if (b === "ok" && overlayMode === "countdown" && cdLeft > 0) driverOk();
-  else if (b === "red" && shown("redBtn")) driverRequestsRed();
-  else if (b === "false_alarm" && shown("falseBtn")) driverReportsFalseAlarm();
-  else if (b === "continue" && shown("continueBtn")) setOverlay(null);
-  else if (b === "test") $("testBtn").click();
 }
 
 function medicalLine(fallback) {
@@ -222,13 +203,9 @@ function startCountdown(seconds, peakG, local) {
 }
 
 function driverOk() {
+  clearInterval(cdTimer);
   sendImportant({ type: "ok_pressed" });
   sendImportant({ type: "countdown_result", result: "OK" });
-  showOk();
-}
-
-function showOk() {
-  clearInterval(cdTimer);
   $("cdTitle").textContent = "DRIVER OK";
   $("cdInfo").textContent = "";
   $("cdResult").textContent = medicalLine("MONITOR") + " · yellow flags stay out";
@@ -237,12 +214,8 @@ function showOk() {
 }
 
 function driverTimeout() {
-  sendImportant({ type: "countdown_result", result: "TIMEOUT" });
-  showTimeout();
-}
-
-function showTimeout() {
   clearInterval(cdTimer);
+  sendImportant({ type: "countdown_result", result: "TIMEOUT" });
   $("cdTitle").textContent = "NO RESPONSE";
   $("cdInfo").textContent = "";
   $("cdResult").textContent = medicalLine("URGENT") + " · race control notified";
@@ -411,7 +384,6 @@ $("testBtn").addEventListener("click", () => {
 
 // ---- telemetry + debug strip ------------------------------------------------
 setInterval(() => {
-  if (WHEEL) return;                    // the wheel has no sensors: don't flatten the phone's g trace
   send({ type: "tel", g: +telPeakG.toFixed(2), gyro: Math.round(telPeakDps) });
   telPeakG = 0;
   telPeakDps = 0;
@@ -424,7 +396,6 @@ setInterval(() => {
   const link = $("link");
   link.textContent = ok ? "LINKED" : "NO LINK – LOCAL MODE";
   link.className = ok ? "ok" : "bad";
-  if (WHEEL) return;
   $("debug").textContent =
     `g ${nowG.toFixed(2)}  rot ${Math.round(nowDps)}°/s  sensor ${motionHz} Hz  state ${state}\n` +
     `events ${eventCount} (last: ${lastCls || "-"})  queued ${queue.length}` +
@@ -432,18 +403,12 @@ setInterval(() => {
 }, 1000);
 
 // ---- start ------------------------------------------------------------------
-$("startCar").textContent = WHEEL ? `Car #${CAR_ID} · steering wheel` : `Car #${CAR_ID}`;
-$("carTag").textContent = WHEEL ? `#${CAR_ID} WHEEL` : `#${CAR_ID}`;
-if (WHEEL) {
-  $("testBtn").classList.add("hidden");   // the wheel has a physical TEST button
-  $("debug").classList.add("hidden");
-  document.querySelector("#start .small").textContent =
-    "Steering-wheel display: tap START to turn on sound. The wheel's buttons control this screen.";
-}
+$("startCar").textContent = `Car #${CAR_ID}`;
+$("carTag").textContent = `#${CAR_ID}`;
 
 $("startBtn").addEventListener("click", async () => {
-  // iOS: motion permission must be requested inside the tap handler (not needed on the wheel display)
-  if (!WHEEL && typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+  // iOS: motion permission must be requested inside the tap handler
+  if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
     try {
       const res = await DeviceMotionEvent.requestPermission();
       if (res !== "granted") { alert("Motion permission was denied. Close the tab, reopen the link and tap Allow."); return; }
@@ -453,7 +418,7 @@ $("startBtn").addEventListener("click", async () => {
   }
   try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); beep(880, 80); } catch (e) { /* no sound */ }
   keepAwake();
-  if (!WHEEL) window.addEventListener("devicemotion", onMotion);
+  window.addEventListener("devicemotion", onMotion);
   $("start").classList.add("hidden");
   $("dash").classList.remove("hidden");
   showLevel(0);

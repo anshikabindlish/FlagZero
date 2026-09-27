@@ -2,13 +2,12 @@
 
 Every WebSocket message is a single JSON object with a `type` field. This
 file is the one source of truth for message shapes -- Person A (server) and
-Person C (phones, steering wheel, dashboard) build against this doc, not
+Person C (phones, warning lights, dashboard) build against this doc, not
 against each other's code.
 
 Server: `flagzero/server.py`, FastAPI + uvicorn, port 8000.
 Endpoints:
 - `ws://<host>:8000/ws/car?car=N` -- one connection per phone
-  (`&role=wheel` = the steering-wheel display, connected next to the phone)
 - `ws://<host>:8000/ws/dash` -- one or more dashboards
 
 All timestamps are milliseconds. The server stamps its own receive time on

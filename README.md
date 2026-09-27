@@ -7,7 +7,7 @@
 FlagZero turns phones into connected car sensors. When a car crashes, one server detects the
 incident, fuses every signal about it, decides how serious it is, works out **which cars are
 coming and how many seconds away they are**, and warns each of them on their own screen (and on a
-physical steering wheel) **before they arrive**. Today that job depends on marshals seeing the
+in-car warning lights) **before they arrive**. Today that job depends on marshals seeing the
 crash and waving a flag.
 
 Built in one night at the Formula Tech Hackathon (Sept 2026), targeting **Track 1: Safety
@@ -20,7 +20,7 @@ motorsport safety).
 1. [The problem](#1-the-problem)
 2. [What FlagZero does](#2-what-flagzero-does)
 3. [The demo](#3-the-demo)
-4. [The steering wheel](#4-the-steering-wheel)
+4. [The in-car warning lights](#4-the-in-car-warning-lights)
 5. [How it decides: flags, severity and ETA](#5-how-it-decides-flags-severity-and-eta)
 6. [The proof: Monte Carlo and per-incident replay](#6-the-proof-monte-carlo-and-per-incident-replay)
 7. [Quick start](#7-quick-start)
@@ -53,11 +53,10 @@ with a warning sized to how far away it is?**
 ```mermaid
 flowchart LR
     P["📱 Phone in the car<br/>(accelerometer + gyro)"] -->|impact / spin / rollover| S
-    W["🎮 Steering wheel<br/>(driver buttons)"] -->|I'M OK / red / false alarm| S
     S["🖥️ FlagZero server"] --> F["Fuse signals<br/>(noisy-OR confidence)"]
     F --> V["Severity 0-4"]
     V --> R["Router: ETA + stopping<br/>distance for every car"]
-    R -->|per-car warning| C["📱 Approaching cars<br/>+ wheel LEDs/buzzer"]
+    R -->|per-car warning| C["📱 Approaching cars<br/>+ 🚨 in-car warning lights"]
     V --> M["Driver check (15 s)<br/>+ medical triage"]
     S --> D["🖥️ Race-control dashboard"]
 ```
@@ -69,7 +68,7 @@ flowchart LR
 | **Severity** | Rules turn the fused sources into severity 0-4 (see [section 5](#5-how-it-decides-flags-severity-and-eta)). |
 | **Route** | For **every car** within 2 km upstream, the server computes its ETA to the incident and the distance it needs to slow down. That decides the warning level each car gets: a car 4 s away and a car 35 s away get different warnings. |
 | **Warn** | Each phone gets its own warning (flag, corner, distance, ETA) with beeps and vibration. It acknowledges receipt, which is how latency is measured end to end. |
-| **Driver check** | The crashed car's phone (and steering wheel) runs a **15 s "I'M OK" countdown**. No answer → **automatic RED flag** and medical status URGENT. |
+| **Driver check** | The crashed car's phone runs a **15 s "I'M OK" countdown**. No answer → **automatic RED flag** and medical status URGENT. |
 | **Race control** | A live dashboard shows the incident, its sources and confidence, the approaching cars by ETA, the driver's (simulated) vitals, the Interlagos map, a live g trace, latency, and the proof panel. |
 
 **Rules the team chose** (all implemented):
@@ -87,7 +86,7 @@ flowchart LR
 |---|---|
 | iPhone | **Car #17**, the crash car. Its motion sensors are the crash detector (we drop it on a cushion). |
 | OnePlus 15R | **Car #21**, the approaching car. Placed ~9 s behind car 17 and gets the warnings. |
-| Arduino steering wheel + a phone | Car 17's driver controls: physical buttons, flag LEDs, buzzer ([section 4](#4-the-steering-wheel)) |
+| Arduino (LEDs + buzzer) | Car 21's in-car warning lights ([section 4](#4-the-in-car-warning-lights)) |
 | Laptops | Server + race-control dashboard |
 
 The other **18 cars are simulated** on the real **Interlagos** layout (4,247 m, exported from the
@@ -97,35 +96,33 @@ simulation.
 **Demo flow**
 1. Race control clicks **Scene 2**. Everything resets and car 21 is lined up ~9 s behind car 17, wherever car 17 is.
 2. **Drop the iPhone** on a cushion. Car 17 stops where it is and an incident appears on the dashboard, labelled with the nearest corner.
-3. Car 21's phone switches to YELLOW, then DOUBLE YELLOW as it closes in, with corner, distance and ETA. Its speed is capped (120 km/h under double yellow) as it passes.
-4. Car 17's phone and the steering wheel count down 15 s.
-   - **I'M OK** on the wheel → car 17 rejoins under yellow, medical status MONITOR.
-   - No answer → **automatic RED**, medical status URGENT.
+3. Car 21's phone **and its warning lights** switch to YELLOW, then DOUBLE YELLOW as it closes in (the phone shows corner, distance and ETA; the lights flash and beep). Its speed is capped (120 km/h under double yellow) as it passes.
+4. Car 17's phone counts down 15 s.
+   - **I'M OK** on the phone → car 17 rejoins under yellow, medical status MONITOR.
+   - No answer → **automatic RED**: car 21's red light comes on and it beeps, medical status URGENT.
 5. The proof panel replays **this exact incident** with marshals only vs FlagZero, then race control clicks **Reset**.
 
 ---
 
-## 4. The steering wheel
+## 4. The in-car warning lights
 
-A cardboard F1-style wheel with real buttons. The phone taped in the middle is the display; the
-buttons do exactly what the phone's own buttons do.
+An Arduino with a **yellow LED, a red LED and a buzzer** is the in-car warning light for **car 21,
+the car behind the crash**. The same idea as the flag lights in a race car's cockpit: the driver
+doesn't have to spot a marshal's flag, the car tells them.
 
-| Button | Arduino pin | Works when |
+| Car 21's warning | Lights | Buzzer |
 |---|---|---|
-| I'M OK | D2 | during the countdown |
-| CONTINUE UNDER YELLOW | D3 | after I'M OK / after reporting a false alarm |
-| RECOMMEND RED FLAG | D4 | during the countdown, or after I'M OK (not under red) |
-| REPORT FALSE ALARM | D5 | after I'M OK (not under red) |
+| Clear | off | – |
+| Caution / yellow | yellow on | 1-2 beeps when it comes on |
+| Double yellow / slow zone | yellow flashing | 3 beeps |
+| Red flag | red on | 6 beeps |
+| No link to the laptop | short yellow blip every second | – |
 
-Yellow LED (A2) and red LED (A3), each through 220 Ω, plus an active buzzer (A1): off = clear,
-yellow = caution/yellow, flashing yellow = double yellow/slow zone, red = red flag, red and yellow
-alternating with a beep every second = the I'M OK countdown. No soldering needed; everything
-plugs into a breadboard. Full wiring and setup: [`hardware/wheel/README.md`](hardware/wheel/README.md).
-
-**How it connects:** `tools/wheel.py` runs on the laptop the Arduino is plugged into. A button
-press becomes a `wheel_button` message on the server, which passes it to **every screen of that
-car** (the crash-sensor phone and the wheel display, `/car?car=17&wheel=1`). Each screen acts as if
-the button had been tapped. When one screen answers the countdown, the others close theirs.
+No buttons and no soldering: everything plugs into a breadboard (buzzer on A1, yellow LED on A2,
+red LED on A3, each LED through 220 Ω). `tools/warning_lights.py` runs on the laptop the Arduino
+is plugged into, follows car 21's warning on the server's dashboard feed and sends it to the
+Arduino a few times a second, so the lights change at the same moment as car 21's phone. Wiring
+and setup: [`hardware/warning_lights/README.md`](hardware/warning_lights/README.md).
 
 ---
 
@@ -218,14 +215,13 @@ page. Phones need https for motion sensors; the tunnel provides it.
 |---|---|---|
 | iPhone (car 17) | `https://<tunnel>/car?car=17` (scan the QR) | START → Allow motion |
 | OnePlus (car 21) | `https://<tunnel>/car?car=21` | START |
-| Wheel's phone | `https://<tunnel>/car?car=17&wheel=1` | START (for sound) |
-| Steering wheel | `py -m flagzero.tools.wheel` on its laptop (close the Arduino IDE first) | – |
+| Warning lights | `py -m flagzero.tools.warning_lights` on the laptop the Arduino is plugged into (close the Arduino IDE first) | – |
 | Race control | `http://localhost:8000/dashboard` | Scene 2 → drop the phone → Reset |
 
 **No hardware at all**
 ```bash
 py -m flagzero.tools.mock_car --car 17        # keyboard phone: i impact, o ok, x timeout, d red request, f false alarm
-py -m flagzero.tools.wheel --no-arduino       # keyboard wheel: o ok, c continue, r red, f false alarm, t test crash
+py -m flagzero.tools.warning_lights --no-arduino   # prints what car 21's warning lights would show
 py -m flagzero.tools.scene_check 2            # plays a whole scene against the running server
 py -m flagzero.sim.montecarlo --n 10000       # the Monte Carlo on its own
 ```
@@ -234,7 +230,7 @@ Or open `/dashboard?mock=1` for the dashboard running on mock data.
 **Troubleshooting**
 - `DNS_PROBE_FINISHED_NXDOMAIN`: the tunnel name was opened before it went live (10-40 s). Wait a minute or clear the browser's DNS cache. The launcher waits for you.
 - Port 8000 busy: an old server is still running. `netstat -ano | findstr :8000`, then `taskkill /PID <n> /F`.
-- Wheel says it can't open the port: close the Arduino IDE (its Serial Monitor holds the port), or pass `--port COM5`.
+- The warning-lights script can't open the port: close the Arduino IDE (its Serial Monitor holds the port), or pass `--port COM5`.
 
 ---
 
@@ -248,11 +244,11 @@ flagzero/
   core/                     engine, incidents (association), fusion (noisy-OR), severity,
                             router (ETA/flags), medical, latency, state, track
   sim/                      sim.py (20-car race), marshal.py, montecarlo.py
-  web/                      car.html/js (phone + wheel display), dashboard.html/js, join.html (QR)
-  tools/                    start_demo, wheel, mock_car, scene_check, export_track, ...
+  web/                      car.html/js (phone), dashboard.html/js, join.html (QR)
+  tools/                    start_demo, warning_lights, mock_car, scene_check, export_track
   track.json                real Interlagos from FastF1
   docs/                     protocol.md, state_message.md, phone_changes.md (every change vs the plan)
-hardware/wheel/             Arduino sketch + wiring for the steering wheel
+hardware/warning_lights/    Arduino sketch + wiring for the in-car warning lights
 tests/                      pytest suite
 results/montecarlo.json     saved 10,000-run Monte Carlo (the dashboard's fallback)
 ```
@@ -265,12 +261,11 @@ and [`flagzero/docs/state_message.md`](flagzero/docs/state_message.md).
 ## 9. Tests
 
 ```bash
-py -m pytest -q        # 61 tests
+py -m pytest -q        # 63 tests
 ```
 They drive the same engine the server uses, with no phones needed. Covered: the simulation,
 router/ETA, severity, the countdown and auto-red, driver requests, association, latency, the Monte
-Carlo, and the steering wheel (its flag/countdown logic, and the server passing a wheel button to
-both screens). The run rewrites `results/montecarlo.json`, so restore it afterwards with
+Carlo, and the warning lights (the level they show for the car behind a crash). The run rewrites `results/montecarlo.json`, so restore it afterwards with
 `git checkout -- results/`.
 
 ---
@@ -303,11 +298,11 @@ certified safety system. What that means in practice:
 
 **Medical and driver**
 - The driver's heart rate and SpO2 on the dashboard are **simulated**, not measured.
-- The 15 s countdown can't tell "unconscious" from "didn't notice the screen". In a real car it would need to live on the wheel (we started that) and in the driver's radio.
+- The 15 s countdown can't tell "unconscious" from "didn't notice the screen". In a real car it would need to be on the steering wheel and in the driver's radio.
 
-**Steering wheel**
-- It's tethered to a laptop by USB, and the 16x2 LCD didn't work reliably on our breadboard, so a phone is the display.
-- We had four buttons, so there's no physical test-crash button (use `t` in `tools/wheel.py` instead).
+**Warning lights**
+- One set of lights for one car (car 21), tethered to a laptop by USB. A real system would build them into every car's dash.
+- They show exactly what the phone shows, just more visibly. A small breadboard buzzer won't be heard over a race engine.
 
 **Scope**
 - One circuit and one server. There's no data from real race control, no integration with real marshal systems, and no handling of pit lane, weather or track-limits events.
@@ -320,7 +315,7 @@ certified safety system. What that means in practice:
 |---|---|
 | **Ananya (A)** | Server, core engine (incidents, fusion, severity, router, medical, latency), race simulation, Monte Carlo |
 | **Anshika (B)** | Overhead-camera prototype (dropped from the final build) |
-| **Vyom (C)** | Phone car node, race-control dashboard, steering wheel, launcher and tools, integration |
+| **Vyom (C)** | Phone car node, race-control dashboard, in-car warning lights, launcher and tools, integration |
 
 Track data: [FastF1](https://github.com/theOehrly/Fast-F1) (2023 São Paulo GP pole lap).
 Made overnight with a lot of coffee and help from Claude.
