@@ -27,8 +27,7 @@ motorsport safety).
 8. [Repository layout](#8-repository-layout)
 9. [Tests](#9-tests)
 10. [Honest limits](#10-honest-limits)
-11. [Paused: the overhead camera (OpenCV)](#11-paused-the-overhead-camera-opencv)
-12. [Team](#12-team)
+11. [Team](#11-team)
 
 ---
 
@@ -66,7 +65,7 @@ flowchart LR
 | Step | What happens |
 |---|---|
 | **Detect** | The phone in each car classifies motion into KERB, SPIN, IMPACT, SEVERE or ROLLOVER from peak g, rotation rate, rotation angle and a flip test. It also reports when the car is lying still afterwards. |
-| **Fuse** | Every signal about one place and moment (within 50 m and 5 s) joins one incident. Confidence is combined with a noisy-OR, so independent sources reinforce each other. |
+| **Fuse** | Every signal about one place and moment (within 50 m and 5 s) joins one incident. Confidence is combined with a noisy-OR, so independent sources (the phone, the driver) reinforce each other. |
 | **Severity** | Rules turn the fused sources into severity 0-4 (see [section 5](#5-how-it-decides-flags-severity-and-eta)). |
 | **Route** | For **every car** within 2 km upstream, the server computes its ETA to the incident and the distance it needs to slow down. That decides the warning level each car gets: a car 4 s away and a car 35 s away get different warnings. |
 | **Warn** | Each phone gets its own warning (flag, corner, distance, ETA) with beeps and vibration. It acknowledges receipt, which is how latency is measured end to end. |
@@ -148,7 +147,7 @@ the button had been tapped. When one screen answers the countdown, the others cl
 | Severity | When | Most any car is shown |
 |---|---|---|
 | 1 | a kerb strike, or any single source with confidence < 0.6 | Caution |
-| 2 | spin, mild impact, debris, a stopped car | Yellow |
+| 2 | spin, or a mild impact | Yellow |
 | 3 | strong impact (≥ 8 g), rollover, or an impact followed by the car lying still | Double yellow |
 | 4 | no answer to the 15 s check, or the driver recommends red | Red flag recommended (auto-RED on timeout) |
 
@@ -175,17 +174,18 @@ We can't crash real race cars, so we measured the *warning chain* in simulation.
 [`flagzero/sim/montecarlo.py`](flagzero/sim/montecarlo.py) replays 10,000 random incidents. The
 next car arrives 1-10 s behind at 150-250 km/h, with a 50-250 m sightline and 1.0-1.5 g braking.
 Each incident is played twice: with **marshals only** (a post sees it 50% of the time, then 0.8-2.5 s
-to react and 0.5-1.5 s to flag), and with **FlagZero** (0.3 s phone detection, 0.05-0.3 s network).
+to react and 0.5-1.5 s to flag), and with **FlagZero** (0.3 s phone detection, 0.05-0.3 s network;
+the phone misses 10 % of crashes, and then only the marshals are left).
 
 Saved run (`results/montecarlo.json`, 10,000 incidents, seed 42):
 
 | | Marshals only | FlagZero |
 |---|---|---|
-| Approaching car warned before reaching the hazard | 48.4 % | **98.5 %** |
-| Secondary impacts | 54.9 % | **26.2 %** (−52 %) |
+| Approaching car warned before reaching the hazard | 48.4 % | **94.9 %** |
+| Secondary impacts | 54.9 % | **28.3 %** (−48 %) |
 | Median time from incident to warning | 4.6 s | **0.49 s** |
-| Average speed on reaching the hazard | 92 km/h | **43 km/h** |
-| False yellows per hour (whole field) | 0 | 1.35 *(placeholder rate, see limits)* |
+| Average speed on reaching the hazard | 92 km/h | **47 km/h** |
+| False yellows per hour (whole field) | 0 | 1.2 *(placeholder rate, see limits)* |
 
 The dashboard reruns this live with sliders (marshal visibility, reaction time, speed, sightline,
 gap), and a chart by gap band shows where no system can help: a car under ~2 s behind can't stop
@@ -243,7 +243,7 @@ Or open `/dashboard?mock=1` for the dashboard running on mock data.
 ```
 start_demo.bat / .command   one-click launcher -> flagzero/tools/start_demo.py
 flagzero/
-  server.py                 FastAPI: pages, APIs, websockets /ws/car /ws/dash /ws/vision
+  server.py                 FastAPI: pages, APIs, websockets /ws/car /ws/dash
   config.py                 every tunable number
   core/                     engine, incidents (association), fusion (noisy-OR), severity,
                             router (ETA/flags), medical, latency, state, track
@@ -252,7 +252,6 @@ flagzero/
   tools/                    start_demo, wheel, mock_car, scene_check, export_track, ...
   track.json                real Interlagos from FastF1
   docs/                     protocol.md, state_message.md, phone_changes.md (every change vs the plan)
-  vision/                   overhead camera pipeline (paused, see section 11)
 hardware/wheel/             Arduino sketch + wiring for the steering wheel
 tests/                      pytest suite
 results/montecarlo.json     saved 10,000-run Monte Carlo (the dashboard's fallback)
@@ -266,7 +265,7 @@ and [`flagzero/docs/state_message.md`](flagzero/docs/state_message.md).
 ## 9. Tests
 
 ```bash
-py -m pytest -q        # 90 tests (+1 slow one: set FZ_SLOW=1)
+py -m pytest -q        # 61 tests
 ```
 They drive the same engine the server uses, with no phones needed. Covered: the simulation,
 router/ETA, severity, the countdown and auto-red, driver requests, association, latency, the Monte
@@ -289,13 +288,13 @@ certified safety system. What that means in practice:
 - The crash thresholds (3 g impact, 6 g severe) were chosen for **dropping a phone on a cushion**, which usually gives < 8 g. Real crashes are tens of g, with far more vibration and kerb noise, so the classifier is **not validated on real vehicles**.
 - We haven't yet measured real detection and false-alarm rates with a proper set of drop tests.
 - Browsers limit the sensors: iOS needs https, a tap to allow motion, and the page open with the screen on. Sample rates vary by phone.
+- **One sensor per car.** Detection relies on the phone alone. There's no second independent source (like a trackside camera) to catch the crashes it misses; the model assumes it misses 10 %, and those fall back to the marshals.
 
 **The Monte Carlo is a model, not data**
 - The parameter ranges (gaps, speeds, sightlines, braking, marshal reaction and visibility) are plausible assumptions, **not fitted to real incident data**.
 - The **false-yellow rate is a placeholder** until drop tests measure it.
 - "Secondary impact" means the next car couldn't slow to a safe speed before the hazard, using a simple stopping-distance model. The marshal baseline is simplified too (one post, a fixed chance of seeing the incident).
-- The saved run assumes an overhead camera covering **80 %** of incidents. The camera is paused ([section 11](#11-paused-the-overhead-camera-opencv)), so the live demo runs on phones alone.
-- The −52 % figure compares the two models under the same assumptions. It is **not** a prediction for a real circuit.
+- The −48 % figure compares the two models under the same assumptions. It is **not** a prediction for a real circuit.
 
 **Connectivity**
 - Everything goes through a free cloudflared tunnel and the venue's internet. Latency is measured over that path, not over a race-grade radio network.
@@ -311,30 +310,16 @@ certified safety system. What that means in practice:
 - We had four buttons, so there's no physical test-crash button (use `t` in `tools/wheel.py` instead).
 
 **Scope**
-- One circuit, one camera zone (paused), and one server. There's no data from real race control, no integration with real marshal systems, and no handling of pit lane, weather or track-limits events.
+- One circuit and one server. There's no data from real race control, no integration with real marshal systems, and no handling of pit lane, weather or track-limits events.
 
 ---
 
-## 11. Paused: the overhead camera (OpenCV)
-
-The repo includes a computer-vision pipeline by Person B (`flagzero/vision/`). An overhead camera
-watches a paper section of track (1,380-1,480 m of the lap), tracks ArUco-marker or coloured
-"cars", and raises predictive hazards (SPIN_RISK, CLOSING, OFF_TRACK, SLOWING) and debris alerts.
-The server already fuses these as extra sources (`/ws/vision`), and the tests for it pass.
-
-It has only been tested on a **synthetic video**, and it's **not part of the current demo** while
-we fix problems with the real camera. The rest of FlagZero doesn't depend on it. If it works in
-time, it gets added back with `start_demo --vision N`. The steps are in
-[`flagzero/vision/`](flagzero/vision/) and the camera tools are `camera_test` and `calibrate`.
-
----
-
-## 12. Team
+## 11. Team
 
 | | Built |
 |---|---|
 | **Ananya (A)** | Server, core engine (incidents, fusion, severity, router, medical, latency), race simulation, Monte Carlo |
-| **Anshika (B)** | Computer-vision pipeline (paused) |
+| **Anshika (B)** | Overhead-camera prototype (dropped from the final build) |
 | **Vyom (C)** | Phone car node, race-control dashboard, steering wheel, launcher and tools, integration |
 
 Track data: [FastF1](https://github.com/theOehrly/Fast-F1) (2023 São Paulo GP pole lap).

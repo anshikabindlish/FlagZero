@@ -2,7 +2,7 @@
 import pytest
 
 from flagzero import config
-from flagzero.core.state import CAMERA, RUNNING, STOPPED
+from flagzero.core.state import RUNNING, STOPPED
 from flagzero.core.track import default_track, load_track, upstream_distance, wrap
 from flagzero.sim.sim import Simulation
 
@@ -38,7 +38,6 @@ def test_track_basics():
     assert [c.name for c in t.corners] == [f"T{i}" for i in range(1, 9)]
     pts = t.raw["polyline"]
     assert len(pts) == 200 and pts[0]["s"] == 0
-    assert t.raw["paper_track"] == {"from_m": 1380.0, "to_m": 1480.0, "corner": "T4"}
     assert t.nearest_corner(1400).name == "T4"
 
 
@@ -52,7 +51,6 @@ def test_interlagos_track():
     assert "Interlagos" in t.raw["name"]
     assert [c.name for c in t.corners] == [f"T{i}" for i in range(1, 16)]
     assert [c.s for c in t.corners] == sorted(c.s for c in t.corners)
-    assert "paper_track" not in t.raw                     # no corner is special
     for c in t.corners:
         assert t.nearest_corner(c.s + 5).name == c.name
 
@@ -98,26 +96,6 @@ def test_stop_car_and_release():
     sim.run_headless(5)
     assert sim.world.cars[17].state == RUNNING
     assert sim.world.cars[17].track_m != pos
-
-
-def test_camera_override_then_timeout():
-    sim = make_sim()
-    sim.apply_camera(17, 1423.0, now_s=100.0)
-    c = sim.world.cars[17]
-    assert c.state == CAMERA and c.track_m == 1423.0
-    sim.tick(0.05, now_s=100.2)                 # camera still fresh: sim leaves it
-    assert c.track_m == 1423.0
-    sim.apply_camera(17, 1424.0, now_s=100.5)   # hand pushing the car slowly
-    assert c.speed_mps == pytest.approx(2.0)
-    sim.tick(0.05, now_s=101.5)                 # camera lost it: sim takes over
-    assert c.state == RUNNING and c.track_m > 1424.0
-
-
-def test_camera_does_not_unstop_a_crashed_car():
-    sim = make_sim()
-    sim.stop_car(17)
-    sim.apply_camera(17, 1423.0, now_s=1.0)
-    assert sim.world.cars[17].state == STOPPED
 
 
 def test_state_message_shape():

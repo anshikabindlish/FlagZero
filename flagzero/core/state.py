@@ -21,7 +21,6 @@ def now_ms() -> int:
 # Car states
 RUNNING = "RUNNING"
 STOPPED = "STOPPED"      # stopped in place by an incident
-CAMERA = "CAMERA"        # position currently coming from the overhead camera
 
 
 @dataclass
@@ -32,7 +31,6 @@ class CarState:
     state: str = RUNNING
     has_phone: bool = False
     warning: int = 0                 # 0 NORMAL ... 5 RED (set by the router, A2)
-    camera_seen_s: Optional[float] = None   # monotonic time of last camera fix
     pace: float = 1.0                # per-car speed multiplier
 
     @property
@@ -56,11 +54,11 @@ class Incident:
 
     sources: one entry per (src, kind), e.g.
       {"src": "IMU", "kind": "IMPACT", "conf": 0.88, "peak_g": 5.2, "ms": ...}
-      {"src": "CAMERA", "kind": "STOPPED_VEHICLE", "conf": 0.93, "ms": ...}
+      {"src": "DRIVER", "kind": "RED_FLAG", "conf": None, "ms": ...}
       {"src": "NO_RESPONSE", "kind": "TIMEOUT", "conf": None, "ms": ...}
     """
     id: int
-    kind: str                        # headline kind: IMPACT, SPIN, DEBRIS, STOPPED_VEHICLE, ...
+    kind: str                        # headline kind: IMPACT, SEVERE, ROLLOVER, SPIN, KERB
     track_m: float
     corner: str
     car: Optional[int] = None
@@ -114,11 +112,9 @@ class WorldState:
     red_auto: bool = False           # RED came from a countdown timeout, not a click
     latency: dict[str, Any] = field(default_factory=dict)
     vitals: dict[int, dict] = field(default_factory=dict)   # phone car -> SIM vitals
-    last_vision: Optional[dict[str, Any]] = None
     # connections (WebSocket objects); left empty in headless mode
     car_sockets: dict[int, Any] = field(default_factory=dict)
     dash_sockets: set = field(default_factory=set)
-    vision_sockets: set = field(default_factory=set)
     _next_incident_id: int = 1
 
     def new_incident_id(self) -> int:

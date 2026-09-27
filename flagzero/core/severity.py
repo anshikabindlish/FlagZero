@@ -2,12 +2,10 @@
 
 0  nothing
 1  IMU KERB, or any single source with confidence < 0.6
-2  SPIN; mild IMPACT; camera STOPPED_VEHICLE alone; DEBRIS;
-   camera SPIN_RISK / CLOSING / OFF_TRACK (predictive: yellow while the car is still moving;
-   low-confidence predicted OFF_TRACK and SLOWING stay at 1 via the lone-low-confidence rule)
-3  strong IMPACT or ROLLOVER; IMPACT followed by still:true; MULTI_STOP
-4  level 3 AND countdown TIMEOUT AND camera confirms a stationary vehicle
-   (at least 3 corroborating signals)  -> RED FLAG RECOMMENDED
+2  SPIN; mild IMPACT
+3  strong IMPACT or ROLLOVER; IMPACT followed by still:true
+4  level 3 AND countdown TIMEOUT  -> RED FLAG RECOMMENDED
+(The overhead camera and its sources were removed from the project.)
 
 Team change: with AUTO_RED_ON_TIMEOUT, a driver who does not press I'm OK
 within COUNTDOWN_S (15 s) makes the incident severity 4 on its own, and RED
@@ -35,9 +33,7 @@ RESPONSES = {
 
 def severity(inc: Incident) -> int:
     imu = [s for s in inc.sources if s["src"] == "IMU"]
-    cam = [s for s in inc.sources if s["src"] == "CAMERA"]
     imu_kinds = {s["kind"] for s in imu}
-    cam_kinds = {s["kind"] for s in cam}
     strong_impact = any(
         s["kind"] == "SEVERE" or (s["kind"] == "IMPACT" and (s.get("peak_g") or 0) >= config.IMPACT_STRONG_G)
         for s in imu)
@@ -46,10 +42,9 @@ def severity(inc: Incident) -> int:
     lvl = 0
     if "KERB" in imu_kinds:
         lvl = max(lvl, 1)
-    if imu_kinds & {"SPIN", "IMPACT"} or cam_kinds & {"STOPPED_VEHICLE", "DEBRIS", "SPIN_RISK", "CLOSING", "OFF_TRACK"}:
+    if imu_kinds & {"SPIN", "IMPACT"}:
         lvl = max(lvl, 2)
-    if strong_impact or "ROLLOVER" in imu_kinds or "MULTI_STOP" in cam_kinds \
-            or (any_impact and inc.still):
+    if strong_impact or "ROLLOVER" in imu_kinds or (any_impact and inc.still):
         lvl = max(lvl, 3)
 
     # a lone low-confidence source is capped at CAUTION
@@ -57,9 +52,7 @@ def severity(inc: Incident) -> int:
     if len(best) == 1 and next(iter(best.values())) < config.LOW_CONF:
         lvl = min(lvl, 1) if lvl else 1
 
-    corroborating = int(bool(imu)) + int("STOPPED_VEHICLE" in cam_kinds or "MULTI_STOP" in cam_kinds) \
-        + int(inc.countdown == "TIMEOUT")
-    if lvl >= 3 and inc.countdown == "TIMEOUT" and corroborating >= 3:
+    if lvl >= 3 and inc.countdown == "TIMEOUT":
         lvl = 4
     if config.AUTO_RED_ON_TIMEOUT and inc.countdown == "TIMEOUT":
         lvl = 4

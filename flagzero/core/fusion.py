@@ -1,7 +1,7 @@
 """A3: noisy-OR fusion.
 
 fused = 1 - prod(1 - conf_i) over independent sources. Each source type (IMU,
-CAMERA) counts once, using its best confidence. A missing I'm-OK response is a
+DRIVER, ...) counts once, using its best confidence. A missing I'm-OK response is a
 corroborating signal for escalation but adds nothing to the number.
 """
 from __future__ import annotations

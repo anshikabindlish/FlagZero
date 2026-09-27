@@ -5,8 +5,8 @@ Each run = one random incident with one car following it.
     braking 1.0-1.5 g, driver reaction 0.7-1.5 s
 Time until the driver is warned:
     marshal:  see + react + flag            (sim/marshal.py)
-    FlagZero: min(IMU 0.3 s, camera 0.5-1.0 s) + network 0.05-0.3 s,
-              each source can miss; if all miss -> the marshal path
+    FlagZero: phone IMU 0.3 s + network 0.05-0.3 s;
+              if the phone misses the crash -> the marshal path
 Either way, if the driver reaches the sightline first they see it themselves.
 Secondary impact = distance left when the driver knows < d_need.
 
@@ -33,8 +33,7 @@ DEFAULTS = {
     "driver_react_min": config.MC_DRIVER_REACT_S[0], "driver_react_max": config.MC_DRIVER_REACT_S[1],
     "marshal_react_min": config.MARSHAL_REACT_S[0], "marshal_react_max": config.MARSHAL_REACT_S[1],
     "visibility": config.MARSHAL_VISIBILITY,
-    "imu_fn": config.MC_IMU_FALSE_NEG, "camera_fn": config.MC_CAMERA_FALSE_NEG,
-    "camera_coverage": config.MC_CAMERA_COVERAGE,
+    "imu_fn": config.MC_IMU_FALSE_NEG,
     "network_min": config.MC_NETWORK_S[0], "network_max": config.MC_NETWORK_S[1],
 }
 
@@ -77,10 +76,7 @@ def run(n: int = config.MC_N, seed: Optional[int] = None, **overrides) -> dict:
     t_marshal = m["total"]
 
     imu_ok = rng.random(n) >= p["imu_fn"]
-    cam_ok = (rng.random(n) < p["camera_coverage"]) & (rng.random(n) >= p["camera_fn"])
-    t_imu = np.where(imu_ok, config.MC_IMU_DETECT_S, np.inf)
-    t_cam = np.where(cam_ok, rng.uniform(*config.MC_CAMERA_DETECT_S, n), np.inf)
-    t_detect = np.minimum(t_imu, t_cam)
+    t_detect = np.where(imu_ok, config.MC_IMU_DETECT_S, np.inf)
     t_net = rng.uniform(p["network_min"], p["network_max"], n)
     all_missed = np.isinf(t_detect)
     t_fz = np.where(all_missed, t_marshal, t_detect + t_net)
@@ -90,7 +86,7 @@ def run(n: int = config.MC_N, seed: Optional[int] = None, **overrides) -> dict:
 
     base["false_yellows_per_hour"] = 0.0
     fz["false_yellows_per_hour"] = float(
-        (config.MC_FIELD_CARS * config.MC_IMU_FALSE_EVENTS_PER_CAR_HOUR + config.MC_CAMERA_FALSE_EVENTS_PER_HOUR)
+        config.MC_FIELD_CARS * config.MC_IMU_FALSE_EVENTS_PER_CAR_HOUR
         * config.MC_SINGLE_SOURCE_YELLOW_SHARE)
     fz["all_sources_missed_pct"] = float(np.mean(all_missed) * 100)
 

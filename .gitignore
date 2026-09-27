@@ -36,13 +36,6 @@ $RECYCLE.BIN/
 *.code-workspace
 
 # ── FlagZero project-specific ───────────────────────────
-# Captured stills / calibration frames / recorded clips
-flagzero/vision/frames/*
-!flagzero/vision/frames/.gitkeep
-*.mp4
-*.mov
-*.avi
-
 # Local env / secrets (cloudflared tokens, API keys, etc.)
 .env
 .env.*
@@ -57,5 +50,3 @@ results/tunnel_url.txt
 
 # generated at run time
 results/latency.csv
-flagzero/recordings/synthetic*
-flagzero/vision/vision_calib.json

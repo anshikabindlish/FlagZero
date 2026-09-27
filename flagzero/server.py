@@ -3,7 +3,7 @@
 Run from the repo root:
     python3 -m uvicorn flagzero.server:app --host 0.0.0.0 --port 8000 --reload
 
-One process. Phones connect to /ws/car?car=N, the camera to /ws/vision,
+One process. Phones connect to /ws/car?car=N,
 dashboards to /ws/dash. A 20 Hz loop runs the engine (sim, severity, router,
 medical) and broadcasts a "state" message to every dashboard at 10 Hz.
 All the logic lives in core/engine.py; this file only moves messages.
@@ -240,23 +240,6 @@ async def ws_car(ws: WebSocket) -> None:
         if socks.get(car) is ws:
             socks.pop(car, None)
         log.info("%s disconnected: car %s", kind, car)
-
-
-@app.websocket("/ws/vision")
-async def ws_vision(ws: WebSocket) -> None:
-    await ws.accept()
-    world.vision_sockets.add(ws)
-    log.info("vision connected")
-    try:
-        while True:
-            msg, t = await _read_json(ws)
-            if msg is not None and msg.get("type") == "vision":
-                engine.on_vision(msg, t, time.monotonic())
-    except WebSocketDisconnect:
-        pass
-    finally:
-        world.vision_sockets.discard(ws)
-        log.info("vision disconnected")
 
 
 @app.websocket("/ws/dash")

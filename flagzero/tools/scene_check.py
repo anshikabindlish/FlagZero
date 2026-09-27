@@ -1,8 +1,8 @@
 """Play demo Scene 1 or 2 against the running server, pretending to be both
-phones and the camera. Proves the whole core works with no hardware.
+phones. Proves the whole core works with no hardware.
 
 Server must be running. Then:
-    python3 -m flagzero.tools.scene_check 1     (debris -> car 21 goes YELLOW)
+    python3 -m flagzero.tools.scene_check 1     (car 17 spins -> car 21 goes YELLOW)
     python3 -m flagzero.tools.scene_check 2     (crash -> no OK in 15 s -> automatic RED)
 Use --url wss://<tunnel>.trycloudflare.com to test through the tunnel.
 """
@@ -38,7 +38,6 @@ async def run(scene: int, base: str) -> None:
     log: list = []
     async with websockets.connect(f"{base}/ws/car?car=17") as p17, \
             websockets.connect(f"{base}/ws/car?car=21") as p21, \
-            websockets.connect(f"{base}/ws/vision") as v, \
             websockets.connect(f"{base}/ws/dash") as d:
         tasks = [asyncio.create_task(phone(p17, "car17", log)), asyncio.create_task(phone(p21, "car21", log))]
         for ws, car, plat in ((p17, 17, "ios"), (p21, 21, "android")):
@@ -48,28 +47,19 @@ async def run(scene: int, base: str) -> None:
         st0 = await wait_state(d, lambda s: s["cars"])
         pos17 = round(next(c["track_m"] for c in st0["cars"] if c["car"] == 17), 1)
 
-        async def cam(hazards, cars=()):
-            await v.send(json.dumps({"type": "vision", "camera": 1, "cars": list(cars),
-                                     "hazards": hazards, "occluded": False}))
-
         if scene == 1:
-            print(f"judge drops paper on the track at {pos17} m ...")
-            for _ in range(20):
-                await cam([{"kind": "DEBRIS", "track_m": pos17, "conf": 0.9}])
-                await asyncio.sleep(0.1)
+            print(f"car 17 spins at {pos17} m and keeps going ...")
+            await p17.send(json.dumps({"type": "imu_event", "car": 17, "cls": "SPIN", "peak_g": 1.8,
+                                       "dur_ms": 0, "gyro_peak": 420, "rot_deg": 190, "conf": 0.72,
+                                       "capture_ms": 300}))
             st = await wait_state(d, lambda s: s["incidents"])
         else:
-            car17 = [{"car": 17, "track_m": pos17, "speed_px_s": 0, "stationary_s": 0}]
-            print("car 17 stops on the paper, phone dropped on the cushion ...")
-            await cam([], car17)
+            print(f"car 17 crashes at {pos17} m, phone dropped on the cushion ...")
             await p17.send(json.dumps({"type": "imu_event", "car": 17, "cls": "IMPACT", "peak_g": 5.2,
                                        "dur_ms": 40, "gyro_peak": 380, "rot_deg": 35, "conf": 0.88,
                                        "capture_ms": 300}))
             await asyncio.sleep(1.5)
             await p17.send(json.dumps({"type": "imu_update", "car": 17, "still": True}))
-            for _ in range(10):
-                await cam([{"kind": "STOPPED_VEHICLE", "car": 17, "track_m": pos17, "conf": 0.93}], car17)
-                await asyncio.sleep(0.1)
             print("nobody presses OK within 15 s (phone reports TIMEOUT) ...")
             await p17.send(json.dumps({"type": "countdown_result", "car": 17, "result": "TIMEOUT"}))
             st = await wait_state(d, lambda s: s["red_confirmed"])

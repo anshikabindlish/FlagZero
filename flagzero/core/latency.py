@@ -1,6 +1,6 @@
 """A6: real end-to-end latency, all on server time.
 
-For each incident: detect_ms (first imu_event / camera hazard received)
+For each incident: detect_ms (first imu_event received)
  -> warn_sent_ms (first warning with level > 0 sent to another phone car)
  -> ack_ms (that phone's ack for the warning; closest we get to "shown").
 Every completed trial is appended to results/latency.csv.

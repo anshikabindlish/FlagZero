@@ -2,7 +2,7 @@
 
 The server passes messages in and sends out whatever comes back as a list of
 (car, message) pairs. Tests drive the same engine directly, so the whole
-Scene 1 / Scene 2 flow can be checked without phones or a camera.
+Scene 1 / Scene 2 flow can be checked without phones.
 """
 from __future__ import annotations
 
@@ -40,12 +40,11 @@ class Engine:
         for inc in self.world.incidents:
             if inc.id in self._snapshots or not inc.approaching:
                 continue
-            srcs = {s["src"] for s in inc.sources}
             self._snapshots[inc.id] = {
                 "id": inc.id, "kind": inc.kind, "corner": inc.corner, "track_m": inc.track_m, "t_ms": t_ms,
                 "sightline_m": self.sim.track.nearest_corner(inc.track_m).sightline_m,
-                # how long the first sensor took before it could report: phone capture window or camera
-                "detect_s": config.MC_IMU_DETECT_S if "IMU" in srcs else sum(config.MC_CAMERA_DETECT_S) / 2,
+                # how long the phone took before it could report (its capture window)
+                "detect_s": config.MC_IMU_DETECT_S,
                 "cars": [(r["car"], r["dist_m"], r["speed_kmh"]) for r in inc.approaching],
                 "warn_ms": None,                                  # filled in when a phone acks its first warning
             }
@@ -135,17 +134,6 @@ class Engine:
             for k in sorted(self._pings)[:250]:
                 self._pings.pop(k, None)
         return out
-
-    # ------------------------------------------------------------ camera
-    def on_vision(self, msg: dict, t_ms: Optional[int] = None, now_s: Optional[float] = None) -> None:
-        t_ms = now_ms() if t_ms is None else t_ms
-        now_s = time.monotonic() if now_s is None else now_s
-        for c in msg.get("cars", []) or []:
-            if "car" in c and "track_m" in c:
-                self.sim.apply_camera(int(c["car"]), float(c["track_m"]), now_s=now_s)
-        incidents.handle_vision(self.world, self.sim, msg, t_ms)
-        self.world.last_vision = msg
-        severity.update(self.world)
 
     # ------------------------------------------------------------ race control
     def on_dash(self, msg: dict, connected: set[int]) -> Out:

@@ -1067,11 +1067,6 @@
    "note": "last corner onto the main straight"
   }
  ],
- "paper_track": {
-  "from_m": 1380.0,
-  "to_m": 1480.0,
-  "corner": "T4"
- },
  "marshal_posts": [
   {
    "id": "M1",

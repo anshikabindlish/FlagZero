@@ -1,14 +1,14 @@
 # FlagZero v2 Protocol
 
 Every WebSocket message is a single JSON object with a `type` field. This
-file is the one source of truth for message shapes -- Person A (server),
-Person B (vision), and Person C (phones + dashboard) all build against this
-doc, not against each other's code.
+file is the one source of truth for message shapes -- Person A (server) and
+Person C (phones, steering wheel, dashboard) build against this doc, not
+against each other's code.
 
 Server: `flagzero/server.py`, FastAPI + uvicorn, port 8000.
 Endpoints:
 - `ws://<host>:8000/ws/car?car=N` -- one connection per phone
-- `ws://<host>:8000/ws/vision` -- the overhead-camera pipeline
+  (`&role=wheel` = the steering-wheel display, connected next to the phone)
 - `ws://<host>:8000/ws/dash` -- one or more dashboards
 
 All timestamps are milliseconds. The server stamps its own receive time on
@@ -120,28 +120,6 @@ detection.
 
 ---
 
-## Vision -> server (`/ws/vision`, 10 Hz)
-
-```json
-{"type": "vision", "camera": 1,
- "cars": [{"car": 17, "track_m": 1423.4, "speed_px_s": 0.0, "stationary_s": 3.1}],
- "hazards": [{"kind": "STOPPED_VEHICLE|DEBRIS|MULTI_STOP", "car": 17,
-              "track_m": 1423, "conf": 0.93}],
- "occluded": false}
-```
-`cars` reports every tracked car's position on track (additive fields from
-the vision pipeline: `speed_kmh`, `heading_err_deg`, `yaw_rate_dps`, `lateral`,
-`off_track`, `risk`, `visible`, `src`). Hazards may also carry `predicted`
-(bool) and `detail`, and besides `STOPPED_VEHICLE | DEBRIS | MULTI_STOP` the
-camera sends predictive kinds raised while a car is still moving:
-`SPIN_RISK`, `CLOSING` and `OFF_TRACK` (severity 2), and `SLOWING`
-(low confidence, so severity 1). See `flagzero/vision/README.md` §3. `hazards` is the
-current list of active hazards (present only while true, dropped once
-cleared -- not a one-off event). `car` is omitted on a `DEBRIS` hazard
-(debris isn't tied to a specific car). `occluded: true` means a hand/object
-is blocking the view (e.g. someone placing debris) -- the server should NOT
-treat car positions as reliable while this is true.
-
 ## Server -> dashboard (`/ws/dash`, 10 Hz)
 
 ```json
@@ -181,9 +159,9 @@ all operate on internally.
 | Field | Type | Meaning |
 |---|---|---|
 | `id` | int | Unique, assigned on creation. |
-| `kind` | string | The hazard/event kind that created it (`IMPACT`, `STOPPED_VEHICLE`, `DEBRIS`, etc). |
-| `sources` | list[object] | Corroborating inputs, each `{"src", "kind", "conf", "ms"}`: `src` is `IMU`, `CAMERA`, `NO_RESPONSE` or `DRIVER` (`conf` is null for the last two). |
-| `car` | int or null | The car involved, if any (null for track-level hazards like debris). |
+| `kind` | string | The headline event kind (`ROLLOVER`, `SEVERE`, `IMPACT`, `SPIN`, `KERB`). |
+| `sources` | list[object] | Corroborating inputs, each `{"src", "kind", "conf", "ms"}`: `src` is `IMU`, `NO_RESPONSE` or `DRIVER` (`conf` is null for the last two). |
+| `car` | int or null | The car involved. |
 | `track_m` | float | Position along the lap, metres. |
 | `corner` | string | Nearest named corner code, e.g. `"T4"`. |
 | `severity` | int | 0-4, current fused severity. |

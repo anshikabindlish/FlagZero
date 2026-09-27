@@ -10,9 +10,8 @@ Everything the dashboard needs arrives on `/ws/dash` as a `"state"` message 10 t
            "phone": true, "warning": 2}],
  "incidents": [{
    "id": 1, "kind": "IMPACT", "track_m": 1423.0, "corner": "T4", "car": 17,
-   "severity": 4, "label": "RED_FLAG_RECOMMENDED", "fused_conf": 0.9916,
+   "severity": 4, "label": "RED_FLAG_RECOMMENDED", "fused_conf": 0.88,
    "sources": [{"src": "IMU", "kind": "IMPACT", "conf": 0.88, "peak_g": 5.2, "ms": 0},
-               {"src": "CAMERA", "kind": "STOPPED_VEHICLE", "conf": 0.93, "ms": 0},
                {"src": "NO_RESPONSE", "kind": "TIMEOUT", "conf": null, "ms": 0}],
    "still": true, "countdown": "TIMEOUT", "countdown_left_s": null, "medical": "URGENT",
    "approaching": [{"car": 21, "dist_m": 544.9, "speed_kmh": 204.4, "eta_s": 9.6, "warning": 2}]}],

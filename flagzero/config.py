@@ -22,9 +22,6 @@ SIM_START_M = 3900.0             # where the leading car starts
 SIM_SPEED_JITTER = 0.03          # +/- 3 % per-car pace variation
 SIM_SEED = None                  # set an int for a repeatable start
 
-# ---------------------------------------------------------------- camera override
-CAMERA_OVERRIDE_TIMEOUT_S = 0.5  # sim takes over again if vision stops seeing the car
-
 # ---------------------------------------------------------------- router (used from A2)
 ROUTER_MAX_UPSTREAM_M = 2000.0
 ROUTER_T_REACT_S = 1.0
@@ -78,14 +75,10 @@ MC_SIGHTLINE_M = (50.0, 250.0)
 MC_BRAKE_G = (1.0, 1.5)
 MC_DRIVER_REACT_S = (0.7, 1.5)
 MC_IMU_DETECT_S = 0.3
-MC_CAMERA_DETECT_S = (0.5, 1.0)
 MC_NETWORK_S = (0.05, 0.3)
 MC_IMU_FALSE_NEG = 0.10          # replace with the tuning-session numbers (spec §11)
-MC_CAMERA_FALSE_NEG = 0.05       # replace with the vision-metrics numbers
-MC_CAMERA_COVERAGE = 0.8         # share of incidents inside a camera's view
 # false yellows/hour: PLACEHOLDERS until the tuning session measures real rates
 MC_IMU_FALSE_EVENTS_PER_CAR_HOUR = 0.2
-MC_CAMERA_FALSE_EVENTS_PER_HOUR = 0.5
 MC_FIELD_CARS = 20
 MC_SINGLE_SOURCE_YELLOW_SHARE = 0.3   # share of false single-source events that reach YELLOW (rest capped at CAUTION)
 

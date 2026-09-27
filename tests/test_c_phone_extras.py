@@ -173,35 +173,3 @@ def test_engine_snapshots_incident_and_measured_warning(eng):
     e.on_car(21, {"type": "ack", "id": wid}, t_ms=1120)
     assert e.incident_snapshot()["warn_ms"] == 120               # this incident's measured detect -> warn
     assert e.incident_snapshot(snap["id"]) is snap
-
-
-# ---------------------------------------------------------------- B's predictive camera hazards
-@pytest.mark.parametrize("kind,conf,predicted,expected", [
-    ("SPIN_RISK", 0.90, True, 2),        # yellow while the car is still moving
-    ("CLOSING", 0.72, True, 2),
-    ("OFF_TRACK", 0.80, False, 2),       # actually off
-    ("OFF_TRACK", 0.58, True, 1),        # predicted, low confidence -> caution
-    ("SLOWING", 0.50, True, 1),
-])
-def test_predictive_camera_hazards(eng, kind, conf, predicted, expected):
-    pos = eng.world.cars[17].track_m
-    eng.on_vision({"type": "vision", "cars": [], "hazards": [
-        {"kind": kind, "car": 17, "track_m": pos, "conf": conf, "predicted": predicted}]}, t_ms=1000, now_s=1.0)
-    inc = eng.world.incidents[0]
-    assert inc.kind == kind and inc.severity == expected
-    assert inc.sources[0]["predicted"] is predicted
-    assert eng.world.cars[17].state != "STOPPED"        # only a real stop stops the sim car
-
-
-def test_spin_risk_then_stop_then_impact_is_one_incident(eng):
-    e = eng
-    pos = e.world.cars[17].track_m
-    e.on_vision({"type": "vision", "cars": [], "hazards": [
-        {"kind": "SPIN_RISK", "car": 17, "track_m": pos, "conf": 0.9, "predicted": True}]}, t_ms=1000, now_s=1.0)
-    e.on_vision({"type": "vision", "cars": [{"car": 17, "track_m": pos}], "hazards": [
-        {"kind": "STOPPED_VEHICLE", "car": 17, "track_m": pos, "conf": 0.93, "predicted": False}]}, t_ms=3500, now_s=3.5)
-    crash(e, t_ms=3600)
-    assert len(e.world.incidents) == 1
-    inc = e.world.incidents[0]
-    assert {s["kind"] for s in inc.sources} == {"SPIN_RISK", "STOPPED_VEHICLE", "IMPACT"}
-    assert inc.kind == "IMPACT" and inc.severity >= 2 and e.world.cars[17].state == "STOPPED"

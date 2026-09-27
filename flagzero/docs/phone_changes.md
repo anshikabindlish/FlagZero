@@ -3,7 +3,7 @@
 What Person C added or changed on top of the v2 build prompts, and where it lives.
 Message shapes are in `protocol.md` and the dashboard data in `state_message.md`;
 this file is the "why" and the list of edits to Person A's code.
-All 87 tests pass: 86 by default (`python -m pytest -q`), plus B's full-clip test with `FZ_SLOW=1`.
+All 61 tests pass (`python -m pytest -q`).
 
 ## 1. Team decisions (rules)
 
@@ -56,14 +56,13 @@ Reads `state_message.md` fields directly. `/dashboard?mock=1` runs on built-in f
 | `server.py` | `GET /api/montecarlo/incident` |
 | `track.json` | real Interlagos from FastF1; the generic circuit is kept as `track_generic.json` for the generic-track tests |
 | `sim/sim.py`, `tools/scene_check.py` | use car 17's real position instead of the old T4 at 1423 m |
-| `core/incidents.py`, `core/severity.py` (vision) | B's predictive camera kinds accepted (`SPIN_RISK`, `CLOSING`, `OFF_TRACK`, `SLOWING`); `SPIN_RISK`/`CLOSING`/real `OFF_TRACK` → severity 2; camera sources keep `predicted` |
 | `tests/` | `test_a1_sim.py` uses `track_generic.json` for its generic-track checks, plus `test_interlagos_track`; `test_a2_a6.py` scenes use real positions; new `test_c_phone_extras.py` |
 
 ### Why `MC_GAP_S` changed from (0.8, 3) to (1, 10)
-With the next car only 0.8–3 s behind, it is already inside its own stopping distance in ~94% of runs, so no warning system can help and both columns read ~93%. 1–10 s is a realistic spread for 20 cars on a ~80 s lap:
-- secondary impacts **55% → 26%**
+With the next car only 0.8–3 s behind, it is already inside its own stopping distance in ~94% of runs, so no warning system can help and both columns read ~93%. 1–10 s is a realistic spread for 20 cars on a ~80 s lap. Phones only (after the camera was removed):
+- secondary impacts **55% → 28%**
 - median time to warn **4.6 s → 0.49 s**
-- speed at the hazard **92 → 43 km/h**
+- speed at the hazard **92 → 47 km/h**
 
 The dashboard's per-gap-band chart keeps the "too close for any system" band (under ~2 s) visible, so the claim stays honest.
 
@@ -80,18 +79,15 @@ The dashboard's per-gap-band chart keeps the "too close for any system" band (un
 - `server.py`: `/ws/car?car=N&role=wheel` registers a **wheel display** in `wheel_sockets`, next to the car's phone (it doesn't replace it). `send_out` delivers car messages to both, and `connected()` includes wheel displays. `/ws/dash` accepts `{"type":"wheel_button","car":N,"button":"ok|continue|red|false_alarm|test"}` and forwards it to car N's sockets.
 - `car.js`: `?wheel=1` = display mode (no motion sensing, no `tel`, `role=wheel`). A `wheel_button` message presses the matching on-screen button, with the same visibility rules. A `medical` message that arrives mid-countdown closes the countdown (answered on the other screen): MONITOR → DRIVER OK, URGENT → NO RESPONSE.
 
-## 6. Person B (vision): integrated
+## 6. Overhead camera (OpenCV): removed
 
-B's `vision` branch was merged into `flagzero/`:
-- `flagzero/vision/`: the pipeline, calibration, markers and config
-- `flagzero/tools/`: `make_test_video`, `mock_vision`, `replay` (B's `vision_listen` stand-in server was dropped: the real server replaces it)
-- `tests/test_vision.py`: 19 tests
-- `flagzero/recordings/`: the synthetic clip's calibration and ground truth
+The team dropped the computer-vision part (2026-09-27): it had only ever been tested on a synthetic clip
+and was unreliable with the real camera. Removed from `main`:
+- `flagzero/vision/`, `tools/make_test_video.py`, `tools/mock_vision.py`, `tools/replay.py`, `tests/test_vision.py`, `opencv-python`
+- the `/ws/vision` endpoint, `engine.on_vision`, `incidents.handle_vision` and the camera hazard kinds, the camera rules in `severity.py`
+  (severity 4 is now: level 3 + no answer to the countdown), `sim.apply_camera` / the `CAMERA` car state, and `start_demo --vision`
+- the camera from the Monte Carlo: FlagZero's detection is now the phone alone (0.3 s, misses 10 % of crashes → marshal path);
+  `results/montecarlo.json` was re-run (10,000 runs, seed 42)
+- `scene_check` Scene 1 is now a spin (yellow) instead of camera-detected debris
 
-Changes made while integrating:
-- `T4_M` → `PAPER_MARK_M` (no special corner), and the preview/calibration labels changed to match.
-- `LAP_LEN_M` is read from `track.json` (4,247 m).
-- The test's import path now points at the repo root.
-- `start_demo --vision N` starts the camera together with the server and tunnel.
-
-The paper still represents 1380–1480 m (`TRACK_START_M`/`TRACK_END_M` in `vision_config.py`).
+The code is still in the git history if it's ever needed again.

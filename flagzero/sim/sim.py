@@ -16,7 +16,7 @@ import random
 import time
 
 from flagzero import config
-from flagzero.core.state import CAMERA, RUNNING, STOPPED, CarState, WorldState
+from flagzero.core.state import RUNNING, STOPPED, CarState, WorldState
 from flagzero.core.track import Track, default_track, upstream_distance, wrap
 
 
@@ -94,39 +94,14 @@ class Simulation:
             if c.state == STOPPED:
                 c.state = RUNNING
 
-    def apply_camera(self, car: int, track_m: float, now_s: Optional[float] = None) -> None:
-        """Vision sees this car: its camera position replaces the sim position."""
-        c = self.world.cars.get(car)
-        if not c:
-            return
-        now_s = time.monotonic() if now_s is None else now_s
-        new = wrap(track_m, self.lap)
-        if c.state == CAMERA and c.camera_seen_s is not None:
-            dt = now_s - c.camera_seen_s
-            if dt > 0:
-                c.speed_mps = upstream_distance(c.track_m, new, self.lap) / dt
-                if c.speed_mps > self.v_top:   # jumped backwards / noise
-                    c.speed_mps = 0.0
-        else:
-            c.speed_mps = 0.0
-        c.track_m = new
-        c.camera_seen_s = now_s
-        if c.state != STOPPED:
-            c.state = CAMERA
-
     # ------------------------------------------------------------ main update
     def tick(self, dt: float, now_s: Optional[float] = None) -> None:
         """Advance every car by dt seconds. Same code live and headless."""
-        now_s = time.monotonic() if now_s is None else now_s
         self.t += dt
         for c in self.world.cars.values():
             if c.state == STOPPED:
                 c.speed_mps = 0.0
                 continue
-            if c.state == CAMERA:
-                if c.camera_seen_s is not None and now_s - c.camera_seen_s <= config.CAMERA_OVERRIDE_TIMEOUT_S:
-                    continue                    # the camera owns this car's position
-                c.state = RUNNING               # camera lost it: sim takes over
             # Look one tick ahead so braking never lags the profile. A faster-paced
             # car (pace > 1) follows a scaled profile, which needs pace^2 x the braking.
             ahead = c.track_m + c.speed_mps * dt
