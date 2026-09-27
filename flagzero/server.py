@@ -32,6 +32,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 engine = Engine()
 world = engine.world
+# car -> steering-wheel display (/car?car=N&wheel=1), connected alongside that car's phone
+wheel_sockets: dict[int, WebSocket] = {}
 
 
 # ---------------------------------------------------------------- helpers
@@ -51,13 +53,13 @@ async def broadcast_dash(msg: dict) -> None:
 
 async def send_out(out: list[tuple[int, dict]]) -> None:
     for car, msg in out:
-        ws = world.car_sockets.get(car)
-        if ws is not None:
-            await send_json(ws, msg)
+        for ws in (world.car_sockets.get(car), wheel_sockets.get(car)):
+            if ws is not None:
+                await send_json(ws, msg)
 
 
 def connected() -> set[int]:
-    return set(world.car_sockets)
+    return set(world.car_sockets) | set(wheel_sockets)
 
 
 # ---------------------------------------------------------------- main loop
@@ -222,8 +224,11 @@ async def ws_car(ws: WebSocket) -> None:
         car = int(ws.query_params.get("car", "0"))
     except ValueError:
         car = 0
-    world.car_sockets[car] = ws
-    log.info("phone connected: car %s", car)
+    wheel = ws.query_params.get("role") == "wheel"
+    socks = wheel_sockets if wheel else world.car_sockets
+    kind = "wheel display" if wheel else "phone"
+    socks[car] = ws
+    log.info("%s connected: car %s", kind, car)
     try:
         while True:
             msg, t = await _read_json(ws)
@@ -232,9 +237,9 @@ async def ws_car(ws: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        if world.car_sockets.get(car) is ws:
-            world.car_sockets.pop(car, None)
-        log.info("phone disconnected: car %s", car)
+        if socks.get(car) is ws:
+            socks.pop(car, None)
+        log.info("%s disconnected: car %s", kind, car)
 
 
 @app.websocket("/ws/vision")
@@ -263,7 +268,13 @@ async def ws_dash(ws: WebSocket) -> None:
     try:
         while True:
             msg, _ = await _read_json(ws)
-            if msg is not None:
+            if msg is None:
+                continue
+            if msg.get("type") == "wheel_button":
+                # a physical steering-wheel button (tools/wheel.py): that car's screens act as if it was tapped
+                car = int(msg.get("car", 17))
+                await send_out([(car, {"type": "wheel_button", "button": str(msg.get("button", ""))})])
+            else:
                 await send_out(engine.on_dash(msg, connected()))
     except WebSocketDisconnect:
         pass

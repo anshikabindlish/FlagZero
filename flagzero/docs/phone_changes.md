@@ -74,6 +74,11 @@ The dashboard's per-gap-band chart keeps the "too close for any system" band (un
 | `start_demo.bat` / `start_demo.command` → `tools/start_demo.py` | Starts the server and a cloudflared tunnel, waits (via DNS-over-HTTPS) until the tunnel resolves publicly, then opens the dashboard and join page via localhost. Opening a new tunnel name too early makes the PC and Wi-Fi resolvers cache NXDOMAIN. |
 | `tools/mock_car.py` | Keyboard fake phone |
 | `tools/export_track.py` | Regenerates `track.json` from FastF1 (needs `pip install fastf1`) |
+| `tools/wheel.py` + `hardware/wheel/` | Physical steering wheel: Arduino buttons, flag LEDs and buzzer. A button becomes a `wheel_button` on `/ws/dash`; every screen of that car acts as if it had been tapped. The car's flag and countdown drive the LEDs. Needs `pyserial`. |
+
+### Steering wheel: edits to `server.py` and `car.js`
+- `server.py`: `/ws/car?car=N&role=wheel` registers a **wheel display** in `wheel_sockets`, next to the car's phone (it doesn't replace it). `send_out` delivers car messages to both, and `connected()` includes wheel displays. `/ws/dash` accepts `{"type":"wheel_button","car":N,"button":"ok|continue|red|false_alarm|test"}` and forwards it to car N's sockets.
+- `car.js`: `?wheel=1` = display mode (no motion sensing, no `tel`, `role=wheel`). A `wheel_button` message presses the matching on-screen button, with the same visibility rules. A `medical` message that arrives mid-countdown closes the countdown (answered on the other screen): MONITOR → DRIVER OK, URGENT → NO RESPONSE.
 
 ## 6. Person B (vision): integrated
 
