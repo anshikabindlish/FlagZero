@@ -1,18 +1,23 @@
 # FlagZero 🏁
 
-**An AI safety network for motorsport that warns the drivers who haven't reached a crash yet.**
+**The driver most at risk isn't the one who crashed; it's the one who hasn't arrived yet.**
 
-> *"The driver most at risk isn't the one who crashed; it's the one who hasn't arrived yet."*
+When a car crashes, FlagZero reads the crash from the car's own motion sensors, fuses every signal
+about it, decides how serious it is, works out **which cars are coming and how many seconds away
+they are**, and warns each of them in the cockpit **before they arrive**. Today that job depends on
+marshals seeing the crash and waving a flag. (In our demo, phones stand in for the cars' sensors
+and cockpit displays; see [demo vs a real race car](#demo-vs-a-real-race-car).)
 
-FlagZero turns phones into connected car sensors. When a car crashes, one server detects the
-incident, fuses every signal about it, decides how serious it is, works out **which cars are
-coming and how many seconds away they are**, and warns each of them on their own screen (and on a
-in-car warning lights) **before they arrive**. Today that job depends on marshals seeing the
-crash and waving a flag.
-
-Built in one night at the Formula Tech Hackathon (Sept 2026), targeting **Track 1: Safety
-Diagnosis**, **Ollon** (data-driven safety), **TELUS** (connected solution) and **Ampere** (AI for
-motorsport safety).
+### At a glance
+- **What:** each car's motion sensors (IMU) detect a crash; one server predicts which cars are
+  approaching and how many seconds away they are, and warns each of them before it arrives.
+- **Speed:** in 10,000 simulated incidents, drivers were warned in **0.49 s** (median) instead of
+  **4.6 s** with marshals alone. Warning latency is also measured live on the demo phones.
+- **Result (simulation):** **94.9 %** of approaching cars warned in time vs **48.4 %** with
+  marshals, and **48 % fewer** secondary impacts.
+- **Demo hardware:** two phones play the cars (their accelerometer and gyro are the IMU) and an
+  Arduino is the in-car warning light. A real car would use the sensors and cockpit lights it already has.
+- **Honest:** it's a prototype measured in simulation; see [Honest limits](#10-honest-limits).
 
 ---
 
@@ -27,7 +32,8 @@ motorsport safety).
 8. [Repository layout](#8-repository-layout)
 9. [Tests](#9-tests)
 10. [Honest limits](#10-honest-limits)
-11. [Team](#11-team)
+11. [Future work](#11-future-work)
+12. [Team](#12-team)
 
 ---
 
@@ -52,23 +58,23 @@ with a warning sized to how far away it is?**
 
 ```mermaid
 flowchart LR
-    P["📱 Phone in the car<br/>(accelerometer + gyro)"] -->|impact / spin / rollover| S
+    P["🏎️ Car motion sensors (IMU)<br/>(a phone in the demo)"] -->|impact / spin / rollover| S
     S["🖥️ FlagZero server"] --> F["Fuse signals<br/>(noisy-OR confidence)"]
     F --> V["Severity 0-4"]
     V --> R["Router: ETA + stopping<br/>distance for every car"]
-    R -->|per-car warning| C["📱 Approaching cars<br/>+ 🚨 in-car warning lights"]
+    R -->|per-car warning| C["🏎️ Approaching cars<br/>cockpit warning + 🚨 lights"]
     V --> M["Driver check (15 s)<br/>+ medical triage"]
     S --> D["🖥️ Race-control dashboard"]
 ```
 
 | Step | What happens |
 |---|---|
-| **Detect** | The phone in each car classifies motion into KERB, SPIN, IMPACT, SEVERE or ROLLOVER from peak g, rotation rate, rotation angle and a flip test. It also reports when the car is lying still afterwards. |
-| **Fuse** | Every signal about one place and moment (within 50 m and 5 s) joins one incident. Confidence is combined with a noisy-OR, so independent sources (the phone, the driver) reinforce each other. |
+| **Detect** | Each car's motion sensor (an IMU; the phone in the demo) classifies motion into KERB, SPIN, IMPACT, SEVERE or ROLLOVER from peak g, rotation rate, rotation angle and a flip test. It also reports when the car is lying still afterwards. |
+| **Fuse** | Every signal about one place and moment (within 50 m and 5 s) joins one incident. Confidence is combined with a noisy-OR, so independent sources (the car's sensors, the driver) reinforce each other. |
 | **Severity** | Rules turn the fused sources into severity 0-4 (see [section 5](#5-how-it-decides-flags-severity-and-eta)). |
 | **Route** | For **every car** within 2 km upstream, the server computes its ETA to the incident and the distance it needs to slow down. That decides the warning level each car gets: a car 4 s away and a car 35 s away get different warnings. |
-| **Warn** | Each phone gets its own warning (flag, corner, distance, ETA) with beeps and vibration. It acknowledges receipt, which is how latency is measured end to end. |
-| **Driver check** | The crashed car's phone runs a **15 s "I'M OK" countdown**. No answer → **automatic RED flag** and medical status URGENT. |
+| **Warn** | Each car gets its own warning (flag, corner, distance, ETA) in the cockpit, with beeps. The car acknowledges receipt, which is how latency is measured end to end. |
+| **Driver check** | The crashed car's cockpit display runs a **15 s "I'M OK" countdown**. No answer → **automatic RED flag** and medical status URGENT. |
 | **Race control** | A live dashboard shows the incident, its sources and confidence, the approaching cars by ETA, the driver's (simulated) vitals, the Interlagos map, a live g trace, latency, and the proof panel. |
 
 **Rules the team chose** (all implemented):
@@ -101,6 +107,19 @@ simulation.
    - **I'M OK** on the phone → car 17 rejoins under yellow, medical status MONITOR.
    - No answer → **automatic RED**: car 21's red light comes on and it beeps, medical status URGENT.
 5. The proof panel replays **this exact incident** with marshals only vs FlagZero, then race control clicks **Reset**.
+
+
+### Demo vs a real race car
+
+The phones and the Arduino only stand in for what a race car already carries.
+
+| In the demo | In a real race car |
+|---|---|
+| Phone accelerometer + gyro detects the crash | The car's own IMU and accident data recorder (F1 cars carry an FIA accident data recorder with high-g accelerometers) |
+| Simulated positions on the lap | GPS and the circuit's timing loops |
+| Warning on the phone screen, Arduino LEDs + buzzer | Cockpit flag lights, dash display and team radio |
+| I'M OK button on the phone screen | A steering-wheel button or a reply on the radio |
+| Internet tunnel to a laptop server | Race control's telemetry and radio network |
 
 ---
 
@@ -171,8 +190,8 @@ We can't crash real race cars, so we measured the *warning chain* in simulation.
 [`flagzero/sim/montecarlo.py`](flagzero/sim/montecarlo.py) replays 10,000 random incidents. The
 next car arrives 1-10 s behind at 150-250 km/h, with a 50-250 m sightline and 1.0-1.5 g braking.
 Each incident is played twice: with **marshals only** (a post sees it 50% of the time, then 0.8-2.5 s
-to react and 0.5-1.5 s to flag), and with **FlagZero** (0.3 s phone detection, 0.05-0.3 s network;
-the phone misses 10 % of crashes, and then only the marshals are left).
+to react and 0.5-1.5 s to flag), and with **FlagZero** (0.3 s sensor detection, 0.05-0.3 s network;
+the sensor misses 10 % of crashes, and then only the marshals are left).
 
 Saved run (`results/montecarlo.json`, 10,000 incidents, seed 42):
 
@@ -215,7 +234,7 @@ page. Phones need https for motion sensors; the tunnel provides it.
 |---|---|---|
 | iPhone (car 17) | `https://<tunnel>/car?car=17` (scan the QR) | START → Allow motion |
 | OnePlus (car 21) | `https://<tunnel>/car?car=21` | START |
-| Warning lights | `py -m flagzero.tools.warning_lights` on the laptop the Arduino is plugged into (close the Arduino IDE first) | – |
+| Warning lights | `py -m flagzero.tools.warning_lights` (Mac: `python3 -m ...`) on the laptop the Arduino is plugged into, after the server is running (close the Arduino IDE first) | – |
 | Race control | `http://localhost:8000/dashboard` | Scene 2 → drop the phone → Reset |
 
 **No hardware at all**
@@ -265,14 +284,15 @@ py -m pytest -q        # 63 tests
 ```
 They drive the same engine the server uses, with no phones needed. Covered: the simulation,
 router/ETA, severity, the countdown and auto-red, driver requests, association, latency, the Monte
-Carlo, and the warning lights (the level they show for the car behind a crash). The run rewrites `results/montecarlo.json`, so restore it afterwards with
-`git checkout -- results/`.
+Carlo, and the warning lights (the level they show for the car behind a crash). The run rewrites
+`results/montecarlo.json`, so restore it afterwards with `git checkout -- results/`. The dashboard's
+Monte Carlo sliders save their run to the same file, so restore it after using them too.
 
 ---
 
 ## 10. Honest limits
 
-FlagZero is a hackathon prototype. It shows an idea and measures it in simulation; it is **not** a
+FlagZero is a prototype. It shows an idea and measures it in simulation; it is **not** a
 certified safety system. What that means in practice:
 
 **The race is simulated**
@@ -283,7 +303,7 @@ certified safety system. What that means in practice:
 - The crash thresholds (3 g impact, 6 g severe) were chosen for **dropping a phone on a cushion**, which usually gives < 8 g. Real crashes are tens of g, with far more vibration and kerb noise, so the classifier is **not validated on real vehicles**.
 - We haven't yet measured real detection and false-alarm rates with a proper set of drop tests.
 - Browsers limit the sensors: iOS needs https, a tap to allow motion, and the page open with the screen on. Sample rates vary by phone.
-- **One sensor per car.** Detection relies on the phone alone. There's no second independent source (like a trackside camera) to catch the crashes it misses; the model assumes it misses 10 %, and those fall back to the marshals.
+- **One sensor per car.** Detection relies on a single motion sensor per car. There's no second independent source (like a trackside camera) to catch the crashes it misses; the model assumes it misses 10 %, and those fall back to the marshals.
 
 **The Monte Carlo is a model, not data**
 - The parameter ranges (gaps, speeds, sightlines, braking, marshal reaction and visibility) are plausible assumptions, **not fitted to real incident data**.
@@ -309,13 +329,24 @@ certified safety system. What that means in practice:
 
 ---
 
-## 11. Team
+## 11. Future work
 
-| | Built |
-|---|---|
-| **Ananya (A)** | Server, core engine (incidents, fusion, severity, router, medical, latency), race simulation, Monte Carlo |
-| **Anshika (B)** | Overhead-camera prototype (dropped from the final build) |
-| **Vyom (C)** | Phone car node, race-control dashboard, in-car warning lights, launcher and tools, integration |
+- **Measure the detector:** a proper drop-test session for real detection and false-alarm rates, to replace
+  the placeholder rates in the Monte Carlo.
+- **Real positions:** GPS or the circuit's timing loops instead of simulated positions.
+- **Every car, built in:** warning lights in each car's dash and the driver check on the steering wheel
+  and team radio, instead of a phone screen.
+- **Track hazards before a crash:** several cars losing grip at the same spot (oil, fluid, water)
+  becomes a warning before anyone crashes.
+- **Race-grade reliability:** a redundant server, a private radio network instead of a public tunnel,
+  and a login so only race control can press Reset or Confirm red.
+
+---
+
+## 12. Team
+
+FlagZero was designed and built together by **Vyom**, **Anshika** and **Ananya**, with the work
+shared evenly across the three of us.
 
 Track data: [FastF1](https://github.com/theOehrly/Fast-F1) (2023 São Paulo GP pole lap).
-Made overnight with a lot of coffee and help from Claude.
+Made with a lot of coffee and help from Claude.
