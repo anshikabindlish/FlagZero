@@ -17,7 +17,7 @@ sender's clock (phone clocks aren't trustworthy/synced).
 Warning levels: `0 NORMAL, 1 CAUTION, 2 YELLOW, 3 DBL_YELLOW, 4 SLOW_ZONE, 5 RED`
 Severity levels: `0-4` (4 = RED FLAG RECOMMENDED). Level 5 / RED reaches the
 phones either when race control clicks "Confirm red" on the dashboard, or
-automatically when a crashed driver doesn't press I'm OK within 15 s
+automatically when a crashed driver doesn't press I'm OK within 20 s
 (`AUTO_RED_ON_TIMEOUT`).
 
 **Only race control returns a flag to green** (dashboard `reset` / `scene`).
@@ -59,7 +59,7 @@ Driver pressed the big "I'm OK" button during a countdown.
 ```json
 {"type": "countdown_result", "car": 17, "result": "OK|TIMEOUT"}
 ```
-Sent once the 15-second countdown resolves, either way. After `OK` (and no red
+Sent once the 20-second countdown resolves, either way. After `OK` (and no red
 out or recommended for this incident) the crashed car rejoins and drives on
 under the current flags; after `TIMEOUT` it stays stopped and RED goes out
 automatically.
@@ -96,7 +96,7 @@ Sent when this car's warning level changes, and every 250ms while a warning
 is active (so `dist_m`/`eta_s` count down live on screen).
 
 ```json
-{"type": "countdown", "secs": 15, "peak_g": 5.2}
+{"type": "countdown", "secs": 20, "peak_g": 5.2}
 ```
 Tells this phone to show the "PRESS OK" countdown, triggered by an
 IMPACT-or-worse `imu_event` from this same car.

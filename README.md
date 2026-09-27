@@ -63,7 +63,7 @@ flowchart LR
     F --> V["Severity 0-4"]
     V --> R["Router: ETA + stopping<br/>distance for every car"]
     R -->|per-car warning| C["🏎️ Approaching cars<br/>cockpit warning + 🚨 lights"]
-    V --> M["Driver check (15 s)<br/>+ medical triage"]
+    V --> M["Driver check (20 s)<br/>+ medical triage"]
     S --> D["🖥️ Race-control dashboard"]
 ```
 
@@ -74,7 +74,7 @@ flowchart LR
 | **Severity** | Rules turn the fused sources into severity 0-4 (see [section 5](#5-how-it-decides-flags-severity-and-eta)). |
 | **Route** | For **every car** within 2 km upstream, the server computes its ETA to the incident and the distance it needs to slow down. That decides the warning level each car gets: a car 4 s away and a car 35 s away get different warnings. |
 | **Warn** | Each car gets its own warning (flag, corner, distance, ETA) in the cockpit, with beeps. The car acknowledges receipt, which is how latency is measured end to end. |
-| **Driver check** | The crashed car's cockpit display runs a **15 s "I'M OK" countdown**. No answer → **automatic RED flag** and medical status URGENT. |
+| **Driver check** | The crashed car's cockpit display runs a **20 s "I'M OK" countdown**. No answer → **automatic RED flag** and medical status URGENT. |
 | **Race control** | A live dashboard shows the incident, its sources and confidence, the approaching cars by ETA, the driver's (simulated) vitals, the Interlagos map, a live g trace, latency, and the proof panel. |
 
 **Rules the team chose** (all implemented):
@@ -103,7 +103,7 @@ simulation.
 1. Race control clicks **Scene 2**. Everything resets and car 21 is lined up ~9 s behind car 17, wherever car 17 is.
 2. **Drop the iPhone** on a cushion. Car 17 stops where it is and an incident appears on the dashboard, labelled with the nearest corner.
 3. Car 21's phone **and its warning lights** switch to YELLOW, then DOUBLE YELLOW as it closes in (the phone shows corner, distance and ETA; the lights flash and beep). Its speed is capped (120 km/h under double yellow) as it passes.
-4. Car 17's phone counts down 15 s.
+4. Car 17's phone counts down 20 s.
    - **I'M OK** on the phone → car 17 rejoins under yellow, medical status MONITOR.
    - No answer → **automatic RED**: car 21's red light comes on and it beeps, medical status URGENT.
 5. The proof panel replays **this exact incident** with marshals only vs FlagZero, then race control clicks **Reset**.
@@ -165,7 +165,7 @@ and setup: [`hardware/warning_lights/README.md`](hardware/warning_lights/README.
 | 1 | a kerb strike, or any single source with confidence < 0.6 | Caution |
 | 2 | spin, or a mild impact | Yellow |
 | 3 | strong impact (≥ 8 g), rollover, or an impact followed by the car lying still | Double yellow |
-| 4 | no answer to the 15 s check, or the driver recommends red | Red flag recommended (auto-RED on timeout) |
+| 4 | no answer to the 20 s check, or the driver recommends red | Red flag recommended (auto-RED on timeout) |
 
 **Router (per car, every 50 ms)**
 
@@ -318,7 +318,7 @@ certified safety system. What that means in practice:
 
 **Medical and driver**
 - The driver's heart rate and SpO2 on the dashboard are **simulated**, not measured.
-- The 15 s countdown can't tell "unconscious" from "didn't notice the screen". In a real car it would need to be on the steering wheel and in the driver's radio.
+- The 20 s countdown can't tell "unconscious" from "didn't notice the screen". In a real car it would need to be on the steering wheel and in the driver's radio.
 
 **Warning lights**
 - One set of lights for one car (car 21), tethered to a laptop by USB. A real system would build them into every car's dash.

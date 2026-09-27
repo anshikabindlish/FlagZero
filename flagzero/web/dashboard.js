@@ -689,7 +689,7 @@ setInterval(() => {
 
 // ---- ?mock=1: fake state so the dashboard works without a server ---------------
 // 40 s loop: green -> car 17 crashes wherever it is (8 s) -> the phone lies still (10 s) -> then either
-// no response for 15 s -> AUTO RED (odd loops), or the driver asks for red -> Confirm red (even loops).
+// no response for 20 s -> AUTO RED (odd loops), or the driver asks for red -> Confirm red (even loops).
 let mock = null;
 function mockHandle(msg) {
   if (msg.type === "reset" || msg.type === "scene") { mock.t0 = Date.now(); mock.confirmed = false; mock.loop++; }
@@ -716,11 +716,11 @@ function mockTick() {
   const base = 74 + 3 * Math.sin(t / 3);
   let response = null, countdown = null, medical = null;
   if (crashed) {
-    const cdLeft = Math.max(0, Math.ceil(23 - t));
-    if (noResponse) { response = t < 23 ? "WAITING" : "NO_RESPONSE"; countdown = t < 23 ? cdLeft : null; medical = t < 23 ? null : "URGENT"; }
-    else { response = t < 12 ? "WAITING" : "OK"; countdown = t < 12 ? Math.ceil(23 - t) : null; medical = t < 12 ? null : "MONITOR"; }
-    const sources = ["IMU", ...(noResponse && t >= 23 ? ["NO_RESPONSE"] : []), ...(!noResponse && t >= 14 ? ["DRIVER"] : [])];
-    const sev4 = noResponse ? t >= 23 : t >= 14;
+    const cdLeft = Math.max(0, Math.ceil(28 - t));
+    if (noResponse) { response = t < 28 ? "WAITING" : "NO_RESPONSE"; countdown = t < 28 ? cdLeft : null; medical = t < 28 ? null : "URGENT"; }
+    else { response = t < 12 ? "WAITING" : "OK"; countdown = t < 12 ? Math.ceil(28 - t) : null; medical = t < 12 ? null : "MONITOR"; }
+    const sources = ["IMU", ...(noResponse && t >= 28 ? ["NO_RESPONSE"] : []), ...(!noResponse && t >= 14 ? ["DRIVER"] : [])];
+    const sev4 = noResponse ? t >= 28 : t >= 14;
     state.incidents.push({
       id: "mock-" + mock.loop, kind: "IMPACT", car: 17,
       corner: (track.corners.reduce((a, c) => (Math.abs(c.m - HZ) < Math.abs(a.m - HZ) ? c : a), track.corners[0]) || {}).name, track_m: HZ,

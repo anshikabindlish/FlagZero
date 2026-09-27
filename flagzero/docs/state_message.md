@@ -27,7 +27,7 @@ Everything the dashboard needs arrives on `/ws/dash` as a `"state"` message 10 t
 | 1 Active incident | `incidents[0]`: `kind`, `corner`, `track_m`, `label`, `fused_conf`, `sources`, `car` |
 | 2 Approaching cars | `incidents[0].approaching` (already sorted by ETA) |
 | 3 Driver status | `vitals["17"]` (always show a SIM badge), `incidents[0].countdown_left_s` (15 -> 0) |
-| 4 Red flag banner | `red_confirmed` = RED is out. `red_auto: true` means it went out automatically because the driver did not press OK within 15 s. `red_pending` = severity 4 without a timeout, waiting for a manual Confirm red (`{"type":"confirm_red"}`) |
+| 4 Red flag banner | `red_confirmed` = RED is out. `red_auto: true` means it went out automatically because the driver did not press OK within 20 s. `red_pending` = severity 4 without a timeout, waiting for a manual Confirm red (`{"type":"confirm_red"}`) |
 | 5 Track map | shape from `GET /api/track` (`polyline` x/y, `corners`), dots from `cars` |
 | 6 g-force trace | `latency.tel["17"].g` |
 | 7 Latency | `latency.tunnel_rtt_ms`, `latency.last_detect_to_warn_ms` |

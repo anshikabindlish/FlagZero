@@ -48,7 +48,7 @@ SEVERITY_MAX_WARNING = {1: 1, 2: 2, 3: 3, 4: 4}   # sev 3 -> DBL YELLOW, sev 4 -
 SPEED_CAP_KMH = {3: 120.0, 4: 80.0, 5: 60.0}       # sim cars obey DBL YELLOW, SLOW ZONE and RED
 
 # ---------------------------------------------------------------- medical (A4)
-COUNTDOWN_S = 15                 # driver has 15 s to press I'm OK
+COUNTDOWN_S = 20                 # driver has 20 s to press I'm OK
 COUNTDOWN_SERVER_GRACE_S = 3     # server declares TIMEOUT itself if the phone never answers
 AUTO_RED_ON_TIMEOUT = True       # no OK in time -> RED goes out automatically (no click needed)
 HR_REST = (70, 80)

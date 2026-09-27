@@ -19,7 +19,7 @@ const CFG = {
   SPIN_ROT_DEG: 120,
   FLIP_DOT: -0.5,        // gravity direction dot product below this = ROLLOVER (>120 deg)
   COOLDOWN_MS: 2500,
-  COUNTDOWN_S: 15,       // local fallback; the server's countdown.secs wins
+  COUNTDOWN_S: 20,       // local fallback; the server's countdown.secs wins
   LOCAL_COUNTDOWN_WAIT_MS: 500,
   TEL_MS: 100,           // tel at 10 Hz
   LINK_TIMEOUT_MS: 3000,

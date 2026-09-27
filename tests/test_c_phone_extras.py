@@ -30,7 +30,7 @@ def test_crash_stops_car17_where_it_is(eng):
     pos = eng.world.cars[17].track_m
     out = crash(eng)
     assert eng.world.cars[17].track_m == pos and eng.world.cars[17].speed_mps == 0
-    assert any(c == 17 and m["type"] == "countdown" and m["secs"] == 15 for c, m in out)
+    assert any(c == 17 and m["type"] == "countdown" and m["secs"] == config.COUNTDOWN_S for c, m in out)
 
 
 def test_driver_recommends_red_needs_confirm(eng):

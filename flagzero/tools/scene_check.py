@@ -3,7 +3,7 @@ phones. Proves the whole core works with no hardware.
 
 Server must be running. Then:
     python3 -m flagzero.tools.scene_check 1     (car 17 spins -> car 21 goes YELLOW)
-    python3 -m flagzero.tools.scene_check 2     (crash -> no OK in 15 s -> automatic RED)
+    python3 -m flagzero.tools.scene_check 2     (crash -> no OK in 20 s -> automatic RED)
 Use --url wss://<tunnel>.trycloudflare.com to test through the tunnel.
 """
 from __future__ import annotations
@@ -60,7 +60,7 @@ async def run(scene: int, base: str) -> None:
                                        "capture_ms": 300}))
             await asyncio.sleep(1.5)
             await p17.send(json.dumps({"type": "imu_update", "car": 17, "still": True}))
-            print("nobody presses OK within 15 s (phone reports TIMEOUT) ...")
+            print("nobody presses OK within 20 s (phone reports TIMEOUT) ...")
             await p17.send(json.dumps({"type": "countdown_result", "car": 17, "result": "TIMEOUT"}))
             st = await wait_state(d, lambda s: s["red_confirmed"])
 

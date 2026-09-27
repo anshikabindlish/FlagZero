@@ -67,7 +67,7 @@ IMU_IMPACT = {"src": "IMU", "kind": "IMPACT", "conf": 0.88, "peak_g": 5.2}
     (_inc({"src": "IMU", "kind": "IMPACT", "conf": 0.9, "peak_g": 9.0}), 3),  # strong impact
     (_inc({"src": "IMU", "kind": "ROLLOVER", "conf": 0.9}), 3),
     (_inc(IMU_IMPACT, still=True), 3),
-    (_inc(IMU_IMPACT, still=True, countdown="TIMEOUT"), 4),             # no OK in 15 s -> auto red
+    (_inc(IMU_IMPACT, still=True, countdown="TIMEOUT"), 4),             # no OK in time -> auto red
     (_inc(IMU_IMPACT, still=True, countdown="OK"), 3),
 ])
 def test_severity(inc, expected):
@@ -121,7 +121,7 @@ def test_scene2_full_escalation(eng):
     e.on_dash({"type": "scene", "n": 2}, PHONES)
     p17 = round(e.world.cars[17].track_m, 1)            # car 17 crashes wherever it is
     out = e.on_car(17, {"type": "imu_event", "cls": "IMPACT", "peak_g": 5.2, "conf": 0.88}, t_ms=1100)
-    assert out == [(17, {"type": "countdown", "secs": 15, "peak_g": 5.2})]
+    assert out == [(17, {"type": "countdown", "secs": config.COUNTDOWN_S, "peak_g": 5.2})]
     inc = e.world.incidents[0]
     assert inc.severity == 2 and inc.track_m == pytest.approx(p17, abs=1)
     assert e.world.cars[17].state == "STOPPED"
@@ -163,16 +163,17 @@ def test_ok_pressed_means_monitor(eng):
 def test_server_times_out_silent_phone_and_raises_red(eng):
     e = eng
     e.on_car(17, {"type": "imu_event", "cls": "IMPACT", "peak_g": 6, "conf": 0.9}, t_ms=0)
-    out = run_ticks(e, 14, 0, 0.0)
-    assert e.world.incidents[0].countdown == "PENDING"      # still inside the 15 s window
+    wait = config.COUNTDOWN_S - 1
+    out = run_ticks(e, wait, 0, 0.0)
+    assert e.world.incidents[0].countdown == "PENDING"      # still inside the countdown window
     assert not e.world.red_confirmed
-    out = run_ticks(e, 5, 14000, 14.0)                       # phone never answers
+    out = run_ticks(e, config.COUNTDOWN_SERVER_GRACE_S + 2, wait * 1000, float(wait))   # phone never answers
     assert (17, {"type": "medical", "status": "URGENT"}) in out
     assert e.world.incidents[0].countdown == "TIMEOUT"
     assert e.world.red_confirmed and e.world.red_auto
 
 
-def test_ok_within_15s_means_no_red(eng):
+def test_ok_in_time_means_no_red(eng):
     e = eng
     e.on_car(17, {"type": "imu_event", "cls": "IMPACT", "peak_g": 6, "conf": 0.9}, t_ms=0)
     e.on_car(17, {"type": "imu_update", "still": True}, t_ms=1500)

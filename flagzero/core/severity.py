@@ -8,7 +8,7 @@
 (The overhead camera and its sources were removed from the project.)
 
 Team change: with AUTO_RED_ON_TIMEOUT, a driver who does not press I'm OK
-within COUNTDOWN_S (15 s) makes the incident severity 4 on its own, and RED
+within COUNTDOWN_S (20 s) makes the incident severity 4 on its own, and RED
 goes out automatically. Race control can still Confirm red by hand for any
 other severity-4 incident.
 

@@ -10,7 +10,7 @@ All 61 tests pass (`python -m pytest -q`).
 | Rule | Where it's enforced |
 |---|---|
 | **Only race control returns a flag to green** (dashboard Reset / Scene). Drivers can escalate and inform, never clear. | `engine.on_car`: phone `green_flag` is ignored; `driver_request FALSE_ALARM` is only a report |
-| **No response in 15 s = automatic RED** (medical emergency); a *recommended* red still waits for Confirm red | `config.AUTO_RED_ON_TIMEOUT`, `COUNTDOWN_S = 15`, `severity.py` |
+| **No response in 20 s = automatic RED** (medical emergency); a *recommended* red still waits for Confirm red | `config.AUTO_RED_ON_TIMEOUT`, `COUNTDOWN_S = 20`, `severity.py` |
 | **Driver OK = the crashed car rejoins** and drives on under the current yellow/green flags; it stays stopped on red, on no response, or after asking for red | `engine._resume_if_ok`, `router.compute` (only a *stopped* crashed car is skipped) |
 | **Cars behave like a race**: the crashed car stops where it is (no teleport); cars slow to 120 km/h under DBL YELLOW and drive past; RED caps everyone | `config.SPEED_CAP_KMH = {3: 120, 4: 80, 5: 60}`, `ROUTER_FLAG_ZONE_M = 500` |
 | **Real Interlagos, no special corner** | `track.json` (FastF1 export), scenes line car 21 up ~9 s behind car 17 wherever it is |
@@ -20,7 +20,7 @@ All 61 tests pass (`python -m pytest -q`).
 - v2 protocol on `/ws/car?car=N`: `hello`, `tel` (10 Hz), `imu_event` (`cls` KERB/SPIN/IMPACT/SEVERE/ROLLOVER), `imu_update`, `ok_pressed`, `countdown_result`, and it acks every `warning` and `ping`.
 - On-device detection state machine: IDLE → CAPTURE (300 ms) → classify and send → POST (1.5 s stillness → `imu_update`). Thresholds are in `CFG` at the top of `car.js`.
 - Full-screen flag display by `level` (0–5), with the distance counting down, a beep pattern per level, and vibration on Android.
-- 15 s I'M OK countdown, which starts locally if the server's `countdown` hasn't arrived within 500 ms (fail-safe).
+- 20 s I'M OK countdown, which starts locally if the server's `countdown` hasn't arrived within 500 ms (fail-safe).
 - Driver buttons: **I'M OK**, **RECOMMEND RED FLAG** (`driver_request RED_FLAG`), **REPORT FALSE ALARM** (`driver_request FALSE_ALARM`, report only), and **CONTINUE UNDER YELLOW** (closes the panel). There is no green-flag button.
 - NO LINK after 3 s without a message; important messages are queued offline and flushed on reconnect.
 
