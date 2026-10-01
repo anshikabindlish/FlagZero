@@ -17,7 +17,7 @@
     "visibility": 0.5,
     "imu_fn": 0.1,
     "network_min": 0.05,
-    "network_max": 0.3
+    "network_max": 0.05
   },
   "baseline": {
     "warned_before_hazard_pct": 48.43,
@@ -30,11 +30,11 @@
   },
   "flagzero": {
     "warned_before_hazard_pct": 94.89,
-    "secondary_impact_pct": 28.27,
-    "avg_warning_time_s": 4.555504266668923,
+    "secondary_impact_pct": 27.63,
+    "avg_warning_time_s": 4.668420131364854,
     "p5_warning_time_s": -0.15723201367098047,
-    "median_time_to_warn_s": 0.4873080174114073,
-    "avg_speed_at_hazard_kmh": 46.75334289550821,
+    "median_time_to_warn_s": 0.35,
+    "avg_speed_at_hazard_kmh": 45.57363727777414,
     "false_yellows_per_hour": 1.2,
     "all_sources_missed_pct": 9.4
   },
@@ -47,13 +47,13 @@
     },
     "flagzero": {
       "detect_s": 0.3,
-      "network_s": 0.17439725620539293,
-      "total_s": 0.4873080174114073
+      "network_s": 0.05,
+      "total_s": 0.35
     },
     "car_reaches_hazard_s": 5.568882128882148
   },
   "notes": {
     "false_yellows": "placeholder rates in config.py until the tuning session measures them"
   },
-  "runtime_ms": 38.2
+  "runtime_ms": 23.6
 }

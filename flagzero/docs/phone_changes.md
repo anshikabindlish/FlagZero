@@ -60,9 +60,11 @@ Reads `state_message.md` fields directly. `/dashboard?mock=1` runs on built-in f
 
 ### Why `MC_GAP_S` changed from (0.8, 3) to (1, 10)
 With the next car only 0.8–3 s behind, it is already inside its own stopping distance in ~94% of runs, so no warning system can help and both columns read ~93%. 1–10 s is a realistic spread for 20 cars on a ~80 s lap. Phones only (after the camera was removed):
-- secondary impacts **55% → 28%**
-- median time to warn **4.6 s → 0.49 s**
-- speed at the hazard **92 → 47 km/h**
+- secondary impacts **55% → 28%** (54.9% → 27.6%, −50%)
+- median time to warn **4.6 s → 0.35 s** (0.3 s sensor + 0.05 s network)
+- speed at the hazard **92 → 46 km/h**
+
+The network step is fixed at **0.05 s**, the median measured live on the demo phones (detect → phone ack, 53 ms, n=7); it was a 0.05-0.3 s guess before.
 
 The dashboard's per-gap-band chart keeps the "too close for any system" band (under ~2 s) visible, so the claim stays honest.
 

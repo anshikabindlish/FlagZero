@@ -5,7 +5,7 @@ Each run = one random incident with one car following it.
     braking 1.0-1.5 g, driver reaction 0.7-1.5 s
 Time until the driver is warned:
     marshal:  see + react + flag            (sim/marshal.py)
-    FlagZero: phone IMU 0.3 s + network 0.05-0.3 s;
+    FlagZero: phone IMU 0.3 s + network 0.05 s (the measured live median);
               if the phone misses the crash -> the marshal path
 Either way, if the driver reaches the sightline first they see it themselves.
 Secondary impact = distance left when the driver knows < d_need.

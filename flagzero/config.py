@@ -75,7 +75,7 @@ MC_SIGHTLINE_M = (50.0, 250.0)
 MC_BRAKE_G = (1.0, 1.5)
 MC_DRIVER_REACT_S = (0.7, 1.5)
 MC_IMU_DETECT_S = 0.3
-MC_NETWORK_S = (0.05, 0.3)
+MC_NETWORK_S = (0.05, 0.05)      # fixed at the measured live median (detect -> phone ack 53 ms, n=7)
 MC_IMU_FALSE_NEG = 0.10          # replace with the tuning-session numbers (spec §11)
 # false yellows/hour: PLACEHOLDERS until the tuning session measures real rates
 MC_IMU_FALSE_EVENTS_PER_CAR_HOUR = 0.2
